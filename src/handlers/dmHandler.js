@@ -67,55 +67,14 @@ function buildGameListMessage(games, picksRemaining, isPreseason) {
     msg += '\n';
   });
 
-  msg += `Reply with your game number(s) (e.g. 1 or 1,2,3)`;
+  msg += `Reply with your pick(s) in this format: [Team Name] [moneyline or spread]\nExample: Yankees moneyline or Braves spread, Cubs ml\nYou can submit up to ${picksRemaining} pick(s) this session.`;
   msg += `\n\n⚠️ **Important:** Your pick is not confirmed until you see a confirmation message from the bot. If you do not receive a confirmation, your pick was not saved.`;
   return msg;
 }
 
-function buildPickOptionsMessage(selectedGames) {
-  let msg = '';
-
-  selectedGames.forEach(game => {
-    const h2h = getMarketOdds(game, 'h2h');
-    const spreads = getMarketOdds(game, 'spreads');
-    const awayML = getTeamOdds(h2h, game.away_team);
-    const homeML = getTeamOdds(h2h, game.home_team);
-    const awaySpreadOutcome = spreads ? spreads.outcomes.find(o => o.name === game.away_team) : null;
-    const homeSpreadOutcome = spreads ? spreads.outcomes.find(o => o.name === game.home_team) : null;
-
-    msg += `**Game:** ${game.away_team} @ ${game.home_team}\n`;
-    msg += `Your pick options:\n`;
-
-    if (awayML !== null) {
-      const win = getPointsForResult(awayML, 'win');
-      const loss = getPointsForResult(awayML, 'loss');
-      msg += `- ${game.away_team} ML (${formatOdds(awayML)}) → could earn ${win} pts if win / ${loss} pts if loss\n`;
-    }
-    if (homeML !== null) {
-      const win = getPointsForResult(homeML, 'win');
-      const loss = getPointsForResult(homeML, 'loss');
-      msg += `- ${game.home_team} ML (${formatOdds(homeML)}) → could earn ${win} pts if win / ${loss} pts if loss\n`;
-    }
-    if (awaySpreadOutcome) {
-      const win = getPointsForResult(awaySpreadOutcome.price, 'win');
-      const loss = getPointsForResult(awaySpreadOutcome.price, 'loss');
-      msg += `- ${game.away_team} Spread (${formatOdds(awaySpreadOutcome.price)}) → could earn ${win} pts if win / ${loss} pts if loss\n`;
-    }
-    if (homeSpreadOutcome) {
-      const win = getPointsForResult(homeSpreadOutcome.price, 'win');
-      const loss = getPointsForResult(homeSpreadOutcome.price, 'loss');
-      msg += `- ${game.home_team} Spread (${formatOdds(homeSpreadOutcome.price)}) → could earn ${win} pts if win / ${loss} pts if loss\n`;
-    }
-    msg += '\n';
-  });
-
-  msg += `Reply with your pick(s) in this format: [Team Name] [moneyline or spread]\nExample: Yankees moneyline, Red Sox spread`;
-  return msg;
-}
-
-function findTeamInGames(teamInput, selectedGames) {
+function findTeamInGames(teamInput, games) {
   const input = teamInput.toLowerCase().trim();
-  for (const game of selectedGames) {
+  for (const game of games) {
     if (game.away_team.toLowerCase().includes(input) || input.includes(game.away_team.toLowerCase().split(' ').pop().toLowerCase())) {
       return { game, teamName: game.away_team };
     }
@@ -209,43 +168,13 @@ async function handleStep1(message, state) {
   const input = message.content.trim();
   const parts = input.split(',').map(s => s.trim()).filter(Boolean);
 
-  const numbers = [];
-  for (const part of parts) {
-    const n = parseInt(part, 10);
-    if (isNaN(n) || n < 1 || n > state.games.length) {
-      await message.reply(`"${part}" is not a valid game number. Please reply with numbers between 1 and ${state.games.length} (e.g. 1 or 1,2,3).`);
-      return;
-    }
-    numbers.push(n);
-  }
-
-  if (numbers.length === 0) {
-    await message.reply(`Please reply with one or more game numbers (e.g. 1 or 1,2,3).`);
+  if (parts.length === 0) {
+    await message.reply(`Please reply with your pick(s) in this format: [Team Name] [moneyline or spread]\nExample: Yankees moneyline or Braves spread, Cubs ml`);
     return;
   }
 
-  if (numbers.length > state.picksRemaining) {
-    await message.reply(`You only have ${state.picksRemaining} pick(s) remaining this week. Please choose ${state.picksRemaining} or fewer games.`);
-    return;
-  }
-
-  const selectedGames = numbers.map(n => state.games[n - 1]);
-
-  conversationState.set(userId, { ...state, step: 2, selectedGames });
-
-  await message.reply(buildPickOptionsMessage(selectedGames));
-}
-
-async function handleStep2(message, state) {
-  const userId = message.author.id;
-  const input = message.content.trim();
-  const parts = input.split(',').map(s => s.trim()).filter(Boolean);
-
-  if (parts.length !== state.selectedGames.length) {
-    await message.reply(
-      `You selected ${state.selectedGames.length} game(s), so please submit ${state.selectedGames.length} pick(s).\n` +
-      `Format: [Team Name] [moneyline or spread]\nExample: Yankees moneyline, Red Sox spread`
-    );
+  if (parts.length > state.picksRemaining) {
+    await message.reply(`You only have ${state.picksRemaining} pick(s) remaining this week. Please submit ${state.picksRemaining} or fewer picks.`);
     return;
   }
 
@@ -271,9 +200,9 @@ async function handleStep2(message, state) {
     }
     const teamInput = words.slice(0, -1).join(' ');
 
-    const match = findTeamInGames(teamInput, state.selectedGames);
+    const match = findTeamInGames(teamInput, state.games);
     if (!match) {
-      await message.reply(`Could not find team "${teamInput}" in your selected games. Check the team names and try again.`);
+      await message.reply(`Could not find team "${teamInput}" in the available games. Check the team names and try again.`);
       return;
     }
 
@@ -307,12 +236,12 @@ async function handleStep2(message, state) {
   });
   confirmMsg += `Reply **YES** to confirm or anything else to start over.`;
 
-  conversationState.set(userId, { ...state, step: 3, pendingPicks });
+  conversationState.set(userId, { ...state, step: 2, pendingPicks });
 
   await message.reply(confirmMsg);
 }
 
-async function handleStep3(message, state) {
+async function handleStep2(message, state) {
   const userId = message.author.id;
 
   if (message.content.trim().toUpperCase() === 'YES') {
@@ -368,8 +297,6 @@ async function handleDM(message) {
     await handleStep1(message, state);
   } else if (state.step === 2) {
     await handleStep2(message, state);
-  } else if (state.step === 3) {
-    await handleStep3(message, state);
   } else {
     conversationState.delete(userId);
     await handleStep0(message);
