@@ -5,6 +5,7 @@ const path = require('path');
 const { handleDM } = require('./handlers/dmHandler');
 const { startGameNotifier } = require('./handlers/gameStartNotifier');
 const { startGrader } = require('./handlers/grader');
+const { postScoreboard, startScoreboardScheduler } = require('./handlers/scoreboard');
 
 const client = new Client({
   intents: [
@@ -33,6 +34,8 @@ client.once('ready', () => {
   console.log(`Logged in as ${client.user.tag}`);
   startGameNotifier(client);
   startGrader(client);
+  postScoreboard(client);
+  startScoreboardScheduler(client);
 });
 
 client.on('messageCreate', async message => {
