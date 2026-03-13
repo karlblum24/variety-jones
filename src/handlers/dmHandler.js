@@ -357,7 +357,7 @@ async function handleDM(message) {
     return;
   }
 
-  if (Date.now() - state.startedAt > 30 * 1000) {
+  if (Date.now() - state.startedAt > 3 * 60 * 1000) {
     conversationState.delete(userId);
     await handleStep0(message);
     return;
