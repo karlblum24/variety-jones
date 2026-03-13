@@ -62,7 +62,7 @@ function buildGameListMessage(games, picksRemaining, isPreseason) {
       msg += `   ML: ${game.away_team} (${formatOdds(awayML)}) / ${game.home_team} (${formatOdds(homeML)})\n`;
     }
     if (awaySpread && homeSpread) {
-      msg += `   Spread: ${game.away_team} (${formatOdds(awaySpread.price)}) / ${game.home_team} (${formatOdds(homeSpread.price)})\n`;
+      msg += `   Spread: ${game.away_team} ${awaySpread.point} (${formatOdds(awaySpread.price)}) / ${game.home_team} ${homeSpread.point} (${formatOdds(homeSpread.price)})\n`;
     }
     msg += '\n';
   });
@@ -218,11 +218,21 @@ async function handleStep1(message, state) {
       return;
     }
 
+    let point = null;
+    if (pickType === 'spread') {
+      const spreadMarket = getMarketOdds(match.game, 'spreads');
+      if (spreadMarket) {
+        const spreadOutcome = spreadMarket.outcomes.find(o => o.name === match.teamName);
+        if (spreadOutcome) point = spreadOutcome.point;
+      }
+    }
+
     pendingPicks.push({
       game: match.game,
       teamName: match.teamName,
       pickType,
       odds,
+      point,
     });
   }
 
@@ -231,7 +241,8 @@ async function handleStep1(message, state) {
     const opponent = getOpponent(pick.game, pick.teamName);
     const win = getPointsForResult(pick.odds, 'win');
     const loss = getPointsForResult(pick.odds, 'loss');
-    confirmMsg += `${i + 1}. **${pick.teamName}** (${pick.pickType}) vs ${opponent} | ${formatEastern(pick.game.commence_time)} ET\n`;
+    const pickLabel = pick.pickType === 'spread' && pick.point !== null ? `spread ${pick.point}` : pick.pickType;
+    confirmMsg += `${i + 1}. **${pick.teamName}** (${pickLabel}) vs ${opponent} | ${formatEastern(pick.game.commence_time)} ET\n`;
     confirmMsg += `   Odds: ${formatOdds(pick.odds)} | Win: +${win} pts | Loss: ${loss} pts\n\n`;
   });
   confirmMsg += `Reply **YES** to confirm or anything else to start over.`;
