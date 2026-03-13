@@ -68,6 +68,7 @@ function buildGameListMessage(games, picksRemaining, isPreseason) {
   });
 
   msg += `Reply with your game number(s) (e.g. 1 or 1,2,3)`;
+  msg += `\n\n⚠️ **Important:** Your pick is not confirmed until you see a confirmation message from the bot. If you do not receive a confirmation, your pick was not saved.`;
   return msg;
 }
 
@@ -335,7 +336,7 @@ async function handleStep3(message, state) {
 
     conversationState.delete(userId);
     await message.reply(
-      `Your picks are locked in! I'll DM you when each game starts to confirm the closing line and your scoring opportunity.`
+      `✅ **Picks confirmed and saved!**\nYour picks are locked in. I'll DM you when each game starts to confirm the closing line and your scoring opportunity.\n\n⚠️ If you did not receive this message, your pick was not saved. DM the bot again to resubmit.`
     );
   } else {
     await message.reply(`No picks confirmed. Let's start over.`);
