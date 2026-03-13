@@ -285,7 +285,8 @@ async function handleStep2(message, state) {
           pick.game.id,
           pick.teamName,
           pick.pickType,
-          pick.game.commence_time
+          pick.game.commence_time,
+          pick.odds
         );
       } catch (err) {
         await message.reply(`There was an error saving your pick for ${pick.teamName}. Please try again.`);
@@ -296,7 +297,7 @@ async function handleStep2(message, state) {
 
     conversationState.delete(userId);
     await message.reply(
-      `✅ **Picks confirmed and saved!**\nYour picks are locked in. I'll DM you when each game starts to confirm the closing line and your scoring opportunity.\n\n⚠️ If you did not receive this message, your pick was not saved. DM the bot again to resubmit.\n\nnow be a good boy and make all your picks for daddy this week 😈`
+      `✅ **Picks confirmed and saved!**\nYour picks are locked in. Your odds were locked at submission time. I'll DM you when each game starts as a reminder.\n\n⚠️ If you did not receive this message, your pick was not saved. DM the bot again to resubmit.\n\nnow be a good boy and make all your picks for daddy this week 😈`
     );
   } else {
     await message.reply(`No picks confirmed. Let's start over.`);

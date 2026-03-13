@@ -31,7 +31,7 @@ async function getPicksThisWeek(playerId, weekNumber, seasonYear) {
   return data;
 }
 
-async function submitPick(playerId, weekNumber, seasonYear, gameId, teamPicked, pickType, gameStartTime) {
+async function submitPick(playerId, weekNumber, seasonYear, gameId, teamPicked, pickType, gameStartTime, odds) {
   const { data, error } = await supabase
     .from('picks')
     .insert({
@@ -42,7 +42,7 @@ async function submitPick(playerId, weekNumber, seasonYear, gameId, teamPicked, 
       team_picked: teamPicked,
       pick_type: pickType,
       game_start_time: gameStartTime,
-      odds_at_lock: null,
+      odds_at_lock: odds,
     })
     .select()
     .single();
