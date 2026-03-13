@@ -179,7 +179,7 @@ async function handleStep0(message) {
   const chunks = buildGameListMessage(availableGames, picksRemaining, IS_PRESEASON);
   await message.reply(chunks[0]);
   for (let i = 1; i < chunks.length; i++) {
-    await message.channel.send(chunks[i]);
+    await message.author.send(chunks[i]);
   }
 }
 
