@@ -25,10 +25,46 @@ async function getPicksThisWeek(playerId, weekNumber, seasonYear) {
     .select('*')
     .eq('player_id', playerId)
     .eq('week_number', weekNumber)
-    .eq('season_year', seasonYear);
+    .eq('season_year', seasonYear)
+    .eq('cancelled', false);
 
   if (error) throw error;
   return data;
+}
+
+async function getPendingPicks(playerId, weekNumber, seasonYear) {
+  const { data, error } = await supabase
+    .from('picks')
+    .select('*')
+    .eq('player_id', playerId)
+    .eq('week_number', weekNumber)
+    .eq('season_year', seasonYear)
+    .eq('cancelled', false)
+    .is('result', null)
+    .gt('game_start_time', new Date().toISOString());
+
+  if (error) throw error;
+  return data;
+}
+
+async function cancelPick(pickId, playerId) {
+  const { data: pick, error: fetchError } = await supabase
+    .from('picks')
+    .select('*')
+    .eq('id', pickId)
+    .eq('player_id', playerId)
+    .single();
+
+  if (fetchError || !pick) throw new Error('Pick not found or does not belong to player.');
+  if (pick.game_start_time <= new Date().toISOString()) throw new Error('Game has already started. Pick cannot be cancelled.');
+  if (pick.cancelled) throw new Error('Pick is already cancelled.');
+
+  const { error: updateError } = await supabase
+    .from('picks')
+    .update({ cancelled: true })
+    .eq('id', pickId);
+
+  if (updateError) throw updateError;
 }
 
 async function submitPick(playerId, weekNumber, seasonYear, gameId, teamPicked, pickType, gameStartTime, odds) {
@@ -51,4 +87,4 @@ async function submitPick(playerId, weekNumber, seasonYear, gameId, teamPicked, 
   return data;
 }
 
-module.exports = { getOrCreatePlayer, getPicksThisWeek, submitPick };
+module.exports = { getOrCreatePlayer, getPicksThisWeek, getPendingPicks, cancelPick, submitPick };
