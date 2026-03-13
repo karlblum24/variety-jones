@@ -8,12 +8,29 @@ async function getMLBGames() {
     oddsFormat: 'american',
   });
 
-  const res = await fetch(`${ODDS_API_BASE}/sports/baseball_mlb/odds?${params}`);
-  if (!res.ok) throw new Error(`Odds API error: ${res.status}`);
+  const endpoints = [
+    `${ODDS_API_BASE}/sports/baseball_mlb/odds?${params}`,
+    `${ODDS_API_BASE}/sports/baseball_mlb_preseason/odds?${params}`,
+  ];
 
-  const games = await res.json();
+  const results = await Promise.all(
+    endpoints.map(async url => {
+      try {
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`Odds API error: ${res.status}`);
+        return res.json();
+      } catch (err) {
+        console.error(`[oddsApi] Failed to fetch ${url}:`, err.message);
+        return [];
+      }
+    })
+  );
+
   const now = new Date();
-  return games.filter(g => new Date(g.commence_time) > now);
+  return results
+    .flat()
+    .filter(g => new Date(g.commence_time) > now)
+    .sort((a, b) => new Date(a.commence_time) - new Date(b.commence_time));
 }
 
 module.exports = { getMLBGames };
