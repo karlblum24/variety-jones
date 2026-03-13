@@ -2,6 +2,8 @@ const { getMLBGames } = require('../services/oddsApi');
 const { getOrCreatePlayer, getPicksThisWeek, submitPick } = require('../services/picks');
 const { getPointsForResult, picksPerWeek } = require('../config/scoring');
 
+const IS_PRESEASON = process.env.IS_PRESEASON === 'true';
+
 const conversationState = new Map();
 const recentlyProcessed = new Set();
 
@@ -42,8 +44,10 @@ function getTeamOdds(market, teamName) {
   return outcome ? outcome.price : null;
 }
 
-function buildGameListMessage(games, picksRemaining) {
-  let msg = `You have **${picksRemaining}** pick(s) remaining this week. Here are the upcoming games:\n\n`;
+function buildGameListMessage(games, picksRemaining, isPreseason) {
+  let msg = isPreseason
+    ? `⚾ We're in preseason test mode! Make as many picks as you want. The scoreboard resets on Opening Day.\n\n`
+    : `You have **${picksRemaining}** pick(s) remaining this week. Here are the upcoming games:\n\n`;
 
   games.forEach((game, i) => {
     const h2h = getMarketOdds(game, 'h2h');
@@ -167,11 +171,15 @@ async function handleStep0(message) {
     return;
   }
 
-  const picksRemaining = picksPerWeek - picksThisWeek.length;
-
-  if (picksRemaining <= 0) {
-    await message.reply(`You've already used all ${picksPerWeek} picks for this week. Check back next week!`);
-    return;
+  let picksRemaining;
+  if (IS_PRESEASON) {
+    picksRemaining = 999;
+  } else {
+    picksRemaining = picksPerWeek - picksThisWeek.length;
+    if (picksRemaining <= 0) {
+      await message.reply(`You've already used all ${picksPerWeek} picks for this week. Check back next week!`);
+      return;
+    }
   }
 
   const pickedGameIds = new Set(picksThisWeek.map(p => p.game_id));
@@ -192,7 +200,7 @@ async function handleStep0(message) {
     startedAt: Date.now(),
   });
 
-  await message.reply(buildGameListMessage(availableGames, picksRemaining));
+  await message.reply(buildGameListMessage(availableGames, picksRemaining, IS_PRESEASON));
 }
 
 async function handleStep1(message, state) {
