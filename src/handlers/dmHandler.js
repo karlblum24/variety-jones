@@ -406,7 +406,7 @@ async function handleDM(message) {
   const userId = message.author.id;
   const input = message.content.trim().toLowerCase();
 
-  if (SHOW_PICKS_TRIGGERS.has(input) && !conversationState.has(userId)) {
+  if (SHOW_PICKS_TRIGGERS.has(input)) {
     await handleShowPicks(message);
     return;
   }
