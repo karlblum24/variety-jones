@@ -1,4 +1,4 @@
-# Variety Jones
+# Variety Jones — SUBMISSION SLAVE
 
 A Discord bot for a private baseball picks league. Players DM the bot to submit weekly picks on MLB games. Results are graded automatically, scores are tracked in Supabase, and a scoreboard is posted daily.
 
@@ -57,13 +57,13 @@ src/
 │   ├── schema.sql               # Supabase table definitions (players, picks, weekly_scores)
 │   └── supabase.js              # Supabase client singleton
 ├── handlers/
-│   ├── dmHandler.js             # DM-based pick submission flow (4-step conversation)
-│   ├── gameStartNotifier.js     # Polls every 60s, locks closing odds and DMs players at game time
+│   ├── dmHandler.js             # DM pick flow — game slate, pick parsing, confirmation, cancel, show picks
+│   ├── gameStartNotifier.js     # Polls every 60s, DMs players when their game starts
 │   ├── grader.js                # Daily 5:00 AM ET cron — grades completed picks via MLB Stats API
 │   └── scoreboard.js            # Daily 5:05 AM ET cron — posts standings embed to #scoreboard
 ├── services/
 │   ├── oddsApi.js               # Fetches upcoming MLB + preseason odds from The Odds API
-│   └── picks.js                 # Supabase helpers: getOrCreatePlayer, getPicksThisWeek, submitPick
+│   └── picks.js                 # Supabase helpers: player lookup, pick queries, submit, cancel
 ├── deploy-commands.js           # Registers slash commands globally with Discord
 └── index.js                     # Bot entrypoint — wires all handlers and starts the client
 ```
@@ -71,25 +71,31 @@ src/
 ## Key Behaviors
 
 ### DM Pick Flow
-Players DM the bot to submit picks. The bot walks them through a 4-step conversation:
-1. Shows available upcoming games with odds
-2. Player selects game(s) by number
-3. Player selects team + pick type (moneyline or spread) — shorthand `ml`, `rl`, `runline` accepted
-4. Player confirms with YES
+Players DM the bot to submit picks. The bot shows the current game slate with moneyline and spread odds. Players type picks in free-form: `Yankees ml`, `Braves spread, Cubs ml`. Multiple picks can be submitted in one message, comma-separated. The bot shows a confirmation summary and the player replies `YES` to confirm. Sessions expire after 3 minutes of inactivity.
 
-Sessions expire after 30 seconds of inactivity. Duplicate game picks are blocked. Message deduplication prevents double-processing.
+### Odds Locking
+Odds are locked at submission time, not at game start. `odds_at_lock` is written to the pick record on insert. Players can see their locked odds in the confirmation message and in game start DMs.
 
 ### Game Start Notifier
-Runs every 60 seconds. Finds picks where the game has started but `odds_at_lock` is not yet set. Fetches the current closing line from The Odds API, saves it to the pick, and DMs the player with their locked odds and point opportunity.
+Runs every 60 seconds. Finds picks where the game has started and the player hasn't been notified yet. DMs the player with their locked odds and point opportunity for that game.
 
 ### Daily Grader (5:00 AM ET)
-Queries all picks where `result IS NULL` and `odds_at_lock IS NOT NULL` and game time has passed. For each pick, fetches the final score from the MLB Stats API, fuzzy-matches the game by team name and date (tries spring training `gameType=S` first, then regular season `gameType=R`), determines win/loss, calculates points, and updates the pick and weekly scores in Supabase.
+Queries all ungraded picks where the game time has passed. For each pick, fetches the final score from the MLB Stats API, fuzzy-matches the game by team name and date (tries spring training `gameType=S` first, then regular season `gameType=R`), determines win/loss/push, calculates points, and updates the pick and weekly scores in Supabase.
 
 ### Scoreboard (5:05 AM ET)
 Posts a Discord embed to `#scoreboard` with season totals, this week's points, and picks remaining per player. Includes a Longest Shot Award tracking the highest-odds winning pick by half-season (split at July 14). Also posts once on bot startup.
 
 ### Preseason Mode
-When `IS_PRESEASON=true`, the weekly 3-pick cap is removed, the scoreboard shows "unlimited" picks remaining, and the game list shows a preseason banner. All preseason data is wiped before Opening Day.
+When `IS_PRESEASON=true`, the weekly pick cap is removed, the scoreboard shows "unlimited" picks remaining, and the game list shows a preseason banner. Intended for testing before Opening Day.
+
+### Show My Picks
+User types `my picks`, `picks`, `show my picks`, or `show picks` at any time (including mid-conversation). Bot responds with three sections — ⏳ Pending (game hasn't started), 🔒 Locked (game in progress, no result yet), ✅ Completed — plus picks remaining for the week.
+
+### Cancel a Pick
+User types `cancel`, `cancel pick`, `cancel my pick`, or `cancel a pick`. Bot shows a numbered list of pending picks (game hasn't started). User selects one and confirms with YES. The pick is marked `cancelled = true`, the pick slot is returned, but **the game cannot be picked again that week**.
+
+### Discord 2000-Character Limit
+Long messages (game slates, pick summaries) are split at logical boundaries into chunks under 1900 characters. The first chunk is sent as a reply; subsequent chunks are sent via `message.author.send()`.
 
 ## Slash Commands
 
