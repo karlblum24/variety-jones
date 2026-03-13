@@ -1,0 +1,54 @@
+const supabase = require('../database/supabase');
+
+async function getOrCreatePlayer(discordId, discordUsername) {
+  const { data: existing } = await supabase
+    .from('players')
+    .select('*')
+    .eq('discord_id', discordId)
+    .maybeSingle();
+
+  if (existing) return existing;
+
+  const { data: created, error } = await supabase
+    .from('players')
+    .insert({ discord_id: discordId, discord_username: discordUsername })
+    .select()
+    .single();
+
+  if (error) throw error;
+  return created;
+}
+
+async function getPicksThisWeek(playerId, weekNumber, seasonYear) {
+  const { data, error } = await supabase
+    .from('picks')
+    .select('*')
+    .eq('player_id', playerId)
+    .eq('week_number', weekNumber)
+    .eq('season_year', seasonYear);
+
+  if (error) throw error;
+  return data;
+}
+
+async function submitPick(playerId, weekNumber, seasonYear, gameId, teamPicked, pickType, gameStartTime) {
+  const { data, error } = await supabase
+    .from('picks')
+    .insert({
+      player_id: playerId,
+      week_number: weekNumber,
+      season_year: seasonYear,
+      game_id: gameId,
+      team_picked: teamPicked,
+      pick_type: pickType,
+      game_start_time: gameStartTime,
+      odds_at_lock: null,
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+module.exports = { getOrCreatePlayer, getPicksThisWeek, submitPick };

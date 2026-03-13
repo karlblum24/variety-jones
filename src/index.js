@@ -1,9 +1,18 @@
 require('dotenv').config();
-const { Client, Collection, GatewayIntentBits } = require('discord.js');
+const { Client, Collection, GatewayIntentBits, Partials, ChannelType } = require('discord.js');
 const fs = require('fs');
 const path = require('path');
+const { handleDM } = require('./handlers/dmHandler');
+const { startGameNotifier } = require('./handlers/gameStartNotifier');
 
-const client = new Client({ intents: [GatewayIntentBits.Guilds] });
+const client = new Client({
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.DirectMessages,
+    GatewayIntentBits.MessageContent,
+  ],
+  partials: [Partials.Channel],
+});
 
 client.commands = new Collection();
 
@@ -21,6 +30,13 @@ for (const file of commandFiles) {
 
 client.once('ready', () => {
   console.log(`Logged in as ${client.user.tag}`);
+  startGameNotifier(client);
+});
+
+client.on('messageCreate', async message => {
+  if (message.author.bot) return;
+  if (message.channel.type !== ChannelType.DM) return;
+  await handleDM(message);
 });
 
 client.on('interactionCreate', async interaction => {
