@@ -1,0 +1,153 @@
+const cron = require('node-cron');
+const supabase = require('../database/supabase');
+const { getPointsForResult } = require('../config/scoring');
+
+const IS_PRESEASON = process.env.IS_PRESEASON === 'true';
+
+async function fetchMLBSchedule(date, gameType) {
+  const dateStr = date.toISOString().split('T')[0];
+  const url = `https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=${dateStr}&gameType=${gameType}`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`MLB Stats API error: ${res.status}`);
+  return res.json();
+}
+
+function fuzzyMatchTeam(mlbTeamName, ourTeamName) {
+  const lastWord = ourTeamName.trim().split(' ').pop().toLowerCase();
+  return mlbTeamName.toLowerCase().includes(lastWord);
+}
+
+function findGameInSchedule(scheduleData, teamPicked) {
+  for (const date of scheduleData.dates || []) {
+    for (const game of date.games || []) {
+      const mlbAway = game.teams?.away?.team?.name || '';
+      const mlbHome = game.teams?.home?.team?.name || '';
+      if (fuzzyMatchTeam(mlbAway, teamPicked) || fuzzyMatchTeam(mlbHome, teamPicked)) {
+        return game;
+      }
+    }
+  }
+  return null;
+}
+
+function determineResult(game, teamPicked, pickType) {
+  const awayScore = game.teams?.away?.score;
+  const homeScore = game.teams?.home?.score;
+  const mlbAway = game.teams?.away?.team?.name || '';
+  const mlbHome = game.teams?.home?.team?.name || '';
+
+  const isHome = fuzzyMatchTeam(mlbHome, teamPicked);
+  const pickedScore = isHome ? homeScore : awayScore;
+  const opposingScore = isHome ? awayScore : homeScore;
+
+  if (pickType === 'moneyline') {
+    return pickedScore > opposingScore ? 'win' : 'loss';
+  }
+
+  if (pickType === 'spread') {
+    // TODO: improve spread grading to use the actual spread points value (currently not stored)
+    // For now, treating spread picks the same as moneyline for win/loss determination
+    return pickedScore > opposingScore ? 'win' : 'loss';
+  }
+
+  return 'loss';
+}
+
+async function updateWeeklyScores(playerId, weekNumber, seasonYear, pointsAwarded) {
+  const { data: existing } = await supabase
+    .from('weekly_scores')
+    .select('*')
+    .eq('player_id', playerId)
+    .eq('week_number', weekNumber)
+    .eq('season_year', seasonYear)
+    .maybeSingle();
+
+  if (existing) {
+    const { error } = await supabase
+      .from('weekly_scores')
+      .update({
+        total_points: Number(existing.total_points) + pointsAwarded,
+        picks_submitted: existing.picks_submitted + 1,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', existing.id);
+    if (error) throw error;
+  } else {
+    const { error } = await supabase
+      .from('weekly_scores')
+      .insert({
+        player_id: playerId,
+        week_number: weekNumber,
+        season_year: seasonYear,
+        total_points: pointsAwarded,
+        picks_submitted: 1,
+      });
+    if (error) throw error;
+  }
+}
+
+async function runGrader() {
+  console.log('[grader] Running daily grading job...');
+
+  const { data: picks, error } = await supabase
+    .from('picks')
+    .select('*')
+    .is('result', null)
+    .not('odds_at_lock', 'is', null)
+    .lt('game_start_time', new Date().toISOString());
+
+  if (error) {
+    console.error('[grader] Error querying picks:', error);
+    return;
+  }
+
+  console.log(`[grader] Found ${picks.length} pick(s) to grade.`);
+
+  for (const pick of picks) {
+    try {
+      const gameDate = new Date(pick.game_start_time);
+      let scheduleData = await fetchMLBSchedule(gameDate, 'S');
+      let game = findGameInSchedule(scheduleData, pick.team_picked);
+
+      if (!game) {
+        scheduleData = await fetchMLBSchedule(gameDate, 'R');
+        game = findGameInSchedule(scheduleData, pick.team_picked);
+      }
+
+      if (!game) {
+        console.warn(`[grader] No MLB schedule match found for pick ${pick.id} (${pick.team_picked})`);
+        continue;
+      }
+
+      if (game.status?.detailedState !== 'Final') {
+        console.log(`[grader] Game not final yet for pick ${pick.id}, skipping.`);
+        continue;
+      }
+
+      const result = determineResult(game, pick.team_picked, pick.pick_type);
+      const pointsAwarded = getPointsForResult(pick.odds_at_lock, result);
+
+      const { error: updateError } = await supabase
+        .from('picks')
+        .update({ result, points_awarded: pointsAwarded })
+        .eq('id', pick.id);
+
+      if (updateError) throw updateError;
+
+      await updateWeeklyScores(pick.player_id, pick.week_number, pick.season_year, pointsAwarded);
+
+      console.log(`[grader] Graded pick ${pick.id}: ${pick.team_picked} ${pick.pick_type} → ${result} (${pointsAwarded} pts)`);
+    } catch (err) {
+      console.error(`[grader] Error grading pick ${pick.id}:`, err);
+    }
+  }
+
+  console.log('[grader] Grading job complete.');
+}
+
+function startGrader(client) {
+  cron.schedule('0 5 * * *', runGrader, { timezone: 'America/New_York' });
+  console.log('[grader] Scheduled daily grading job at 5:00 AM ET.');
+}
+
+module.exports = { startGrader };

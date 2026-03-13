@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const { handleDM } = require('./handlers/dmHandler');
 const { startGameNotifier } = require('./handlers/gameStartNotifier');
+const { startGrader } = require('./handlers/grader');
 
 const client = new Client({
   intents: [
@@ -31,6 +32,7 @@ for (const file of commandFiles) {
 client.once('ready', () => {
   console.log(`Logged in as ${client.user.tag}`);
   startGameNotifier(client);
+  startGrader(client);
 });
 
 client.on('messageCreate', async message => {
