@@ -45,7 +45,8 @@ function getTeamOdds(market, teamName) {
 }
 
 function buildGameListMessage(games, picksRemaining, isPreseason) {
-  let msg = isPreseason
+  let msg = `Hey there big boy! 👀\n\n`;
+  msg += isPreseason
     ? `⚾ We're in preseason test mode! Make as many picks as you want. The scoreboard resets on Opening Day.\n\n`
     : `You have **${picksRemaining}** pick(s) remaining this week. Here are the upcoming games:\n\n`;
 
@@ -276,7 +277,7 @@ async function handleStep2(message, state) {
 
     conversationState.delete(userId);
     await message.reply(
-      `✅ **Picks confirmed and saved!**\nYour picks are locked in. I'll DM you when each game starts to confirm the closing line and your scoring opportunity.\n\n⚠️ If you did not receive this message, your pick was not saved. DM the bot again to resubmit.`
+      `✅ **Picks confirmed and saved!**\nYour picks are locked in. I'll DM you when each game starts to confirm the closing line and your scoring opportunity.\n\n⚠️ If you did not receive this message, your pick was not saved. DM the bot again to resubmit.\n\nnow be a good boy and make all your picks for daddy this week 😈`
     );
   } else {
     await message.reply(`No picks confirmed. Let's start over.`);
