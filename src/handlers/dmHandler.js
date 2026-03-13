@@ -45,12 +45,13 @@ function getTeamOdds(market, teamName) {
 }
 
 function buildGameListMessage(games, picksRemaining, isPreseason) {
-  let msg = `Hey there big boy! 👀\n\n`;
-  msg += isPreseason
+  const header = `Hey there big boy! 👀\n\n` + (isPreseason
     ? `⚾ We're in preseason test mode! Make as many picks as you want. The scoreboard resets on Opening Day.\n\n`
-    : `You have **${picksRemaining}** pick(s) remaining this week. Here are the upcoming games:\n\n`;
+    : `You have **${picksRemaining}** pick(s) remaining this week. Here are the upcoming games:\n\n`);
 
-  games.forEach((game, i) => {
+  const footer = `Reply with your pick(s) in this format: [Team Name] [moneyline or spread]\nExample: Yankees moneyline or Braves spread, Cubs ml\nYou can submit up to ${picksRemaining} pick(s) this session.\n\n⚠️ **Important:** Your pick is not confirmed until you see a confirmation message from the bot. If you do not receive a confirmation, your pick was not saved.`;
+
+  const gameBlocks = games.map((game, i) => {
     const h2h = getMarketOdds(game, 'h2h');
     const spreads = getMarketOdds(game, 'spreads');
     const awayML = getTeamOdds(h2h, game.away_team);
@@ -58,19 +59,33 @@ function buildGameListMessage(games, picksRemaining, isPreseason) {
     const awaySpread = spreads ? spreads.outcomes.find(o => o.name === game.away_team) : null;
     const homeSpread = spreads ? spreads.outcomes.find(o => o.name === game.home_team) : null;
 
-    msg += `**${i + 1}.** ${game.away_team} @ ${game.home_team} | ${formatEastern(game.commence_time)} ET\n`;
+    let block = `**${i + 1}.** ${game.away_team} @ ${game.home_team} | ${formatEastern(game.commence_time)} ET\n`;
     if (awayML !== null && homeML !== null) {
-      msg += `   ML: ${game.away_team} (${formatOdds(awayML)}) / ${game.home_team} (${formatOdds(homeML)})\n`;
+      block += `   ML: ${game.away_team} (${formatOdds(awayML)}) / ${game.home_team} (${formatOdds(homeML)})\n`;
     }
     if (awaySpread && homeSpread) {
-      msg += `   Spread: ${game.away_team} ${awaySpread.point} (${formatOdds(awaySpread.price)}) / ${game.home_team} ${homeSpread.point} (${formatOdds(homeSpread.price)})\n`;
+      block += `   Spread: ${game.away_team} ${awaySpread.point} (${formatOdds(awaySpread.price)}) / ${game.home_team} ${homeSpread.point} (${formatOdds(homeSpread.price)})\n`;
     }
-    msg += '\n';
+    block += '\n';
+    return block;
   });
 
-  msg += `Reply with your pick(s) in this format: [Team Name] [moneyline or spread]\nExample: Yankees moneyline or Braves spread, Cubs ml\nYou can submit up to ${picksRemaining} pick(s) this session.`;
-  msg += `\n\n⚠️ **Important:** Your pick is not confirmed until you see a confirmation message from the bot. If you do not receive a confirmation, your pick was not saved.`;
-  return msg;
+  const chunks = [];
+  let current = header;
+
+  for (const block of gameBlocks) {
+    if (current.length + block.length > 1900) {
+      chunks.push(current);
+      current = block;
+    } else {
+      current += block;
+    }
+  }
+
+  current += footer;
+  chunks.push(current);
+
+  return chunks;
 }
 
 function findTeamInGames(teamInput, games) {
@@ -161,7 +176,11 @@ async function handleStep0(message) {
     startedAt: Date.now(),
   });
 
-  await message.reply(buildGameListMessage(availableGames, picksRemaining, IS_PRESEASON));
+  const chunks = buildGameListMessage(availableGames, picksRemaining, IS_PRESEASON);
+  await message.reply(chunks[0]);
+  for (let i = 1; i < chunks.length; i++) {
+    await message.channel.send(chunks[i]);
+  }
 }
 
 async function handleStep1(message, state) {
