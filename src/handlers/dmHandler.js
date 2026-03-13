@@ -306,12 +306,111 @@ async function handleStep2(message, state) {
   }
 }
 
+const SHOW_PICKS_TRIGGERS = new Set(['my picks', 'show my picks', 'picks', 'show picks']);
+
+async function handleShowPicks(message) {
+  const now = new Date();
+  const weekNumber = getISOWeek(now);
+  const seasonYear = now.getFullYear();
+  const nowIso = now.toISOString();
+
+  let player;
+  try {
+    player = await getOrCreatePlayer(message.author.id, message.author.username);
+  } catch (err) {
+    await message.reply('Sorry, there was an error loading your account. Please try again later.');
+    return;
+  }
+
+  let picks;
+  try {
+    picks = await getPicksThisWeek(player.id, weekNumber, seasonYear);
+  } catch (err) {
+    await message.reply('Sorry, there was an error loading your picks. Please try again later.');
+    return;
+  }
+
+  if (picks.length === 0) {
+    await message.reply("You have no picks this week yet. DM me anything to get started!");
+    return;
+  }
+
+  const pending = picks.filter(p => p.game_start_time > nowIso && p.result === null);
+  const locked = picks.filter(p => p.game_start_time <= nowIso && p.result === null);
+  const completed = picks.filter(p => p.result !== null);
+
+  const blocks = [];
+
+  if (pending.length > 0) {
+    let section = `⏳ **Pending Picks**\n`;
+    for (const p of pending) {
+      const odds = p.odds_at_lock;
+      const win = odds !== null ? getPointsForResult(odds, 'win') : '?';
+      const loss = odds !== null ? getPointsForResult(odds, 'loss') : '?';
+      const oddsStr = odds !== null ? formatOdds(odds) : 'N/A';
+      section += `• **${p.team_picked}** (${p.pick_type}) | Odds: ${oddsStr} | Win: +${win} pts | Loss: ${loss} pts | ${formatEastern(p.game_start_time)} ET\n`;
+    }
+    blocks.push(section);
+  }
+
+  if (locked.length > 0) {
+    let section = `🔒 **Locked Picks**\n`;
+    for (const p of locked) {
+      const odds = p.odds_at_lock;
+      const win = odds !== null ? getPointsForResult(odds, 'win') : '?';
+      const loss = odds !== null ? getPointsForResult(odds, 'loss') : '?';
+      const oddsStr = odds !== null ? formatOdds(odds) : 'N/A';
+      section += `• **${p.team_picked}** (${p.pick_type}) | Odds: ${oddsStr} | Win: +${win} pts | Loss: ${loss} pts\n`;
+    }
+    blocks.push(section);
+  }
+
+  if (completed.length > 0) {
+    let section = `✅ **Completed Picks**\n`;
+    for (const p of completed) {
+      const odds = p.odds_at_lock;
+      const oddsStr = odds !== null ? formatOdds(odds) : 'N/A';
+      section += `• **${p.team_picked}** (${p.pick_type}) | Odds: ${oddsStr} | Result: ${p.result} | Points: ${p.points_awarded ?? 0}\n`;
+    }
+    blocks.push(section);
+  }
+
+  const picksRemaining = IS_PRESEASON ? 'unlimited' : Math.max(0, picksPerWeek - picks.length);
+  const footer = `\nPicks remaining this week: **${picksRemaining}**`;
+
+  const chunks = [];
+  let current = '';
+
+  for (const block of blocks) {
+    if (current.length + block.length > 1900) {
+      chunks.push(current);
+      current = block;
+    } else {
+      current += (current ? '\n' : '') + block;
+    }
+  }
+  current += footer;
+  chunks.push(current);
+
+  await message.reply(chunks[0]);
+  for (let i = 1; i < chunks.length; i++) {
+    await message.author.send(chunks[i]);
+  }
+}
+
 async function handleDM(message) {
   if (recentlyProcessed.has(message.id)) return;
   recentlyProcessed.add(message.id);
   setTimeout(() => recentlyProcessed.delete(message.id), 5000);
 
   const userId = message.author.id;
+  const input = message.content.trim().toLowerCase();
+
+  if (SHOW_PICKS_TRIGGERS.has(input) && !conversationState.has(userId)) {
+    await handleShowPicks(message);
+    return;
+  }
+
   const state = conversationState.get(userId);
 
   if (!state) {
