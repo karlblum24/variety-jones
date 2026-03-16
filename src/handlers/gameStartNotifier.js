@@ -3,13 +3,6 @@ const { getPointsForResult } = require('../config/scoring');
 
 const notifiedPickIds = new Set();
 
-function getOpponent(pick, teamPicked) {
-  if (pick.home_team && pick.away_team) {
-    return pick.home_team.toLowerCase() === teamPicked.toLowerCase() ? pick.away_team : pick.home_team;
-  }
-  return 'opponent';
-}
-
 function formatOdds(odds) {
   return odds >= 0 ? `+${odds}` : `${odds}`;
 }

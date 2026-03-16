@@ -1,6 +1,8 @@
 const { getMLBGames } = require('../services/oddsApi');
 const { getOrCreatePlayer, getPicksThisWeek, getPendingPicks, cancelPick, submitPick } = require('../services/picks');
 const { getPointsForResult, picksPerWeek } = require('../config/scoring');
+const logger = require('../utils/logger');
+const supabase = require('../database/supabase');
 
 const IS_PRESEASON = process.env.IS_PRESEASON === 'true';
 
@@ -116,36 +118,20 @@ function getOpponent(game, teamName) {
 async function handleStep0(message) {
   const userId = message.author.id;
 
-  let games, player, picksThisWeek;
-  try {
-    games = await getMLBGames();
-  } catch (err) {
-    await message.reply('Sorry, I could not fetch today\'s games. Please try again later.');
-    return;
-  }
+  const games = await getMLBGames();
 
   if (games.length === 0) {
     await message.reply('There are no upcoming MLB games available right now. Check back later!');
     return;
   }
 
-  try {
-    player = await getOrCreatePlayer(message.author.id, message.author.username);
-  } catch (err) {
-    await message.reply('Sorry, there was an error loading your account. Please try again later.');
-    return;
-  }
+  const player = await getOrCreatePlayer(message.author.id, message.author.username);
 
   const now = new Date();
   const weekNumber = getISOWeek(now);
   const seasonYear = now.getFullYear();
 
-  try {
-    picksThisWeek = await getPicksThisWeek(player.id, weekNumber, seasonYear);
-  } catch (err) {
-    await message.reply('Sorry, there was an error loading your picks. Please try again later.');
-    return;
-  }
+  const picksThisWeek = await getPicksThisWeek(player.id, weekNumber, seasonYear);
 
   let picksRemaining;
   if (IS_PRESEASON) {
@@ -159,8 +145,7 @@ async function handleStep0(message) {
   }
 
   // Exclude all games this player has picked this week, including cancelled ones (can't re-pick a cancelled game)
-  const supabaseClient = require('../database/supabase');
-  const { data: allPickRows } = await supabaseClient
+  const { data: allPickRows } = await supabase
     .from('picks')
     .select('game_id')
     .eq('player_id', player.id)
@@ -184,6 +169,8 @@ async function handleStep0(message) {
     picksRemaining,
     startedAt: Date.now(),
   });
+
+  logger.info(userId, 'Step 0 complete, sending game list', { games: availableGames.length, picksRemaining });
 
   const chunks = buildGameListMessage(availableGames, picksRemaining, IS_PRESEASON);
   await message.reply(chunks[0]);
@@ -265,6 +252,8 @@ async function handleStep1(message, state) {
     });
   }
 
+  logger.info(userId, 'Step 1 picks parsed', { count: pendingPicks.length });
+
   let confirmMsg = `Here are your picks:\n\n`;
   pendingPicks.forEach((pick, i) => {
     const opponent = getOpponent(pick.game, pick.teamName);
@@ -298,12 +287,14 @@ async function handleStep2(message, state) {
           pick.odds
         );
       } catch (err) {
+        logger.error(userId, `submitPick failed for ${pick.teamName}`, err);
         await message.reply(`There was an error saving your pick for ${pick.teamName}. Please try again.`);
         conversationState.delete(userId);
         return;
       }
     }
 
+    logger.info(userId, 'Picks confirmed and saved', { count: state.pendingPicks.length });
     conversationState.delete(userId);
     await message.reply(
       `✅ **Picks confirmed and saved!**\nYour picks are locked in. Your odds were locked at submission time. I'll DM you when each game starts as a reminder.\n\n⚠️ If you did not receive this message, your pick was not saved. DM the bot again to resubmit.\n\nnow be a good boy and make all your picks for daddy this week 😈`
@@ -315,8 +306,6 @@ async function handleStep2(message, state) {
   }
 }
 
-const SHOW_PICKS_TRIGGERS = new Set(['my picks', 'show my picks', 'picks', 'show picks']);
-const CANCEL_PICK_TRIGGERS = new Set(['cancel pick', 'cancel a pick', 'cancel my pick', 'cancel']);
 
 async function handleCancelPick(message) {
   const now = new Date();
@@ -324,21 +313,8 @@ async function handleCancelPick(message) {
   const seasonYear = now.getFullYear();
   const userId = message.author.id;
 
-  let player;
-  try {
-    player = await getOrCreatePlayer(userId, message.author.username);
-  } catch (err) {
-    await message.reply('Sorry, there was an error loading your account. Please try again later.');
-    return;
-  }
-
-  let pendingPicks;
-  try {
-    pendingPicks = await getPendingPicks(player.id, weekNumber, seasonYear);
-  } catch (err) {
-    await message.reply('Sorry, there was an error loading your picks. Please try again later.');
-    return;
-  }
+  const player = await getOrCreatePlayer(userId, message.author.username);
+  const pendingPicks = await getPendingPicks(player.id, weekNumber, seasonYear);
 
   if (pendingPicks.length === 0) {
     await message.reply('You have no pending picks to cancel.');
@@ -393,10 +369,12 @@ async function handleCancelFinal(message, state) {
     try {
       await cancelPick(state.selectedPick.id, state.player.id);
     } catch (err) {
+      logger.error(userId, 'cancelPick failed', err);
       await message.reply(`Could not cancel pick: ${err.message}`);
       conversationState.delete(userId);
       return;
     }
+    logger.info(userId, 'Pick cancelled', { pickId: state.selectedPick.id });
     conversationState.delete(userId);
     await message.reply(`✅ Pick cancelled. You have your pick slot back — but remember, you cannot pick this game again this week.`);
   } else {
@@ -410,22 +388,10 @@ async function handleShowPicks(message) {
   const weekNumber = getISOWeek(now);
   const seasonYear = now.getFullYear();
   const nowIso = now.toISOString();
+  const userId = message.author.id;
 
-  let player;
-  try {
-    player = await getOrCreatePlayer(message.author.id, message.author.username);
-  } catch (err) {
-    await message.reply('Sorry, there was an error loading your account. Please try again later.');
-    return;
-  }
-
-  let picks;
-  try {
-    picks = await getPicksThisWeek(player.id, weekNumber, seasonYear);
-  } catch (err) {
-    await message.reply('Sorry, there was an error loading your picks. Please try again later.');
-    return;
-  }
+  const player = await getOrCreatePlayer(userId, message.author.username);
+  const picks = await getPicksThisWeek(player.id, weekNumber, seasonYear);
 
   if (picks.length === 0) {
     await message.reply("You have no picks this week yet. DM me anything to get started!");
@@ -503,41 +469,50 @@ async function handleDM(message) {
   const userId = message.author.id;
   const input = message.content.trim().toLowerCase();
 
-  if (SHOW_PICKS_TRIGGERS.has(input)) {
-    await handleShowPicks(message);
-    return;
-  }
+  logger.info(userId, 'DM received', { input });
 
-  if (CANCEL_PICK_TRIGGERS.has(input)) {
+  try {
+    const SHOW_PICKS_PHRASES = ['my picks', 'show my picks', 'show picks', 'show me picks', 'my pick', 'see my picks', 'view picks'];
+    if (SHOW_PICKS_PHRASES.some(phrase => input.includes(phrase))) {
+      await handleShowPicks(message);
+      return;
+    }
+
+    if (input === 'cancel' || input.startsWith('cancel pick') || input.startsWith('cancel my')) {
+      conversationState.delete(userId);
+      await handleCancelPick(message);
+      return;
+    }
+
+    const state = conversationState.get(userId);
+
+    if (!state) {
+      await handleStep0(message);
+      return;
+    }
+
+    if (Date.now() - state.startedAt > 3 * 60 * 1000) {
+      conversationState.delete(userId);
+      await handleStep0(message);
+      return;
+    }
+
+    if (state.step === 1) {
+      await handleStep1(message, state);
+    } else if (state.step === 2) {
+      await handleStep2(message, state);
+    } else if (state.step === 'cancel_confirm') {
+      await handleCancelConfirm(message, state);
+    } else if (state.step === 'cancel_final') {
+      await handleCancelFinal(message, state);
+    } else {
+      conversationState.delete(userId);
+      await handleStep0(message);
+    }
+  } catch (err) {
+    logger.error(userId, 'Unhandled error in handleDM', err);
     conversationState.delete(userId);
-    await handleCancelPick(message);
-    return;
-  }
-
-  const state = conversationState.get(userId);
-
-  if (!state) {
-    await handleStep0(message);
-    return;
-  }
-
-  if (Date.now() - state.startedAt > 3 * 60 * 1000) {
-    conversationState.delete(userId);
-    await handleStep0(message);
-    return;
-  }
-
-  if (state.step === 1) {
-    await handleStep1(message, state);
-  } else if (state.step === 2) {
-    await handleStep2(message, state);
-  } else if (state.step === 'cancel_confirm') {
-    await handleCancelConfirm(message, state);
-  } else if (state.step === 'cancel_final') {
-    await handleCancelFinal(message, state);
-  } else {
-    conversationState.delete(userId);
-    await handleStep0(message);
+    try { await message.reply('Something went wrong. Please try again.'); } catch (_) {}
   }
 }
 
