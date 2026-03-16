@@ -612,7 +612,11 @@ async function handleDM(message) {
 
     if (Date.now() - state.startedAt > 3 * 60 * 1000) {
       conversationState.delete(userId);
-      await handleStep0(message);
+      if (state.step === 'onboarding_name' || state.step === 'onboarding_venmo') {
+        await handleOnboardingName(message);
+      } else {
+        await handleStep0(message);
+      }
       return;
     }
 
