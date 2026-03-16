@@ -80,9 +80,11 @@ function buildGameListMessage(games, picksRemaining, isPreseason) {
     return block;
   });
 
-  const chunks = [];
-  let current = header;
+  // Header is always its own first chunk
+  const chunks = [header];
 
+  // Chunk game blocks independently
+  let current = '';
   for (const block of gameBlocks) {
     if (current.length + block.length > 1800) {
       chunks.push(current);
@@ -92,8 +94,14 @@ function buildGameListMessage(games, picksRemaining, isPreseason) {
     }
   }
 
-  current += footer;
-  chunks.push(current);
+  // Append footer to last game block chunk
+  if (current.length + footer.length > 1800) {
+    chunks.push(current);
+    chunks.push(footer);
+  } else {
+    current += footer;
+    chunks.push(current);
+  }
 
   return chunks;
 }
