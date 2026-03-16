@@ -141,7 +141,7 @@ async function handleStep0(message) {
       `Here's how it works:\n` +
       `• Each week you get **3 picks** on MLB games\n` +
       `• Pick a team **moneyline** (win outright) or **spread** (cover the run line)\n` +
-      `• Odds are locken — bigger underdogs = more points\n` +
+      `• Odds are locked at submission — bigger underdogs = more points\n` +
       `• Picks lock when the game starts — cancel anytime before that\n` +
       `• Grading happens automatically after games finish\n` +
       `• Type **my picks** to see your picks, **cancel** to cancel one\n\n` +
