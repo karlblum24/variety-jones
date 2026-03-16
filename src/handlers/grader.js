@@ -61,65 +61,77 @@ function determineResult(game, teamPicked, pickType, spreadPoint) {
 }
 
 
-async function runGrader() {
+async function dmAdmin(client, message) {
+  const adminId = process.env.ADMIN_DISCORD_ID;
+  if (!client || !adminId) return;
+  try {
+    const user = await client.users.fetch(adminId);
+    await user.send(message);
+  } catch (err) {
+    console.error('[grader] Failed to DM admin:', err);
+  }
+}
+
+async function runGrader(client = null) {
   console.log('[grader] Running daily grading job...');
+  try {
+    const { data: picks, error } = await supabase
+      .from('picks')
+      .select('*')
+      .is('result', null)
+      .not('odds_at_lock', 'is', null)
+      .lt('game_start_time', new Date().toISOString());
 
-  const { data: picks, error } = await supabase
-    .from('picks')
-    .select('*')
-    .is('result', null)
-    .not('odds_at_lock', 'is', null)
-    .lt('game_start_time', new Date().toISOString());
+    if (error) throw error;
 
-  if (error) {
-    console.error('[grader] Error querying picks:', error);
-    return;
-  }
+    console.log(`[grader] Found ${picks.length} pick(s) to grade.`);
 
-  console.log(`[grader] Found ${picks.length} pick(s) to grade.`);
+    for (const pick of picks) {
+      try {
+        const gameDate = new Date(pick.game_start_time);
+        let scheduleData = await fetchMLBSchedule(gameDate, 'S');
+        let game = findGameInSchedule(scheduleData, pick.team_picked);
 
-  for (const pick of picks) {
-    try {
-      const gameDate = new Date(pick.game_start_time);
-      let scheduleData = await fetchMLBSchedule(gameDate, 'S');
-      let game = findGameInSchedule(scheduleData, pick.team_picked);
+        if (!game) {
+          scheduleData = await fetchMLBSchedule(gameDate, 'R');
+          game = findGameInSchedule(scheduleData, pick.team_picked);
+        }
 
-      if (!game) {
-        scheduleData = await fetchMLBSchedule(gameDate, 'R');
-        game = findGameInSchedule(scheduleData, pick.team_picked);
+        if (!game) {
+          console.warn(`[grader] No MLB schedule match found for pick ${pick.id} (${pick.team_picked})`);
+          continue;
+        }
+
+        if (game.status?.detailedState !== 'Final') {
+          console.log(`[grader] Game not final yet for pick ${pick.id}, skipping.`);
+          continue;
+        }
+
+        const result = determineResult(game, pick.team_picked, pick.pick_type, pick.spread_point);
+        const pointsAwarded = getPointsForResult(pick.odds_at_lock, result);
+
+        const { error: updateError } = await supabase
+          .from('picks')
+          .update({ result, points_awarded: pointsAwarded })
+          .eq('id', pick.id);
+
+        if (updateError) throw updateError;
+
+        console.log(`[grader] Graded pick ${pick.id}: ${pick.team_picked} ${pick.pick_type} → ${result} (${pointsAwarded} pts)`);
+      } catch (err) {
+        console.error(`[grader] Error grading pick ${pick.id}:`, err);
       }
-
-      if (!game) {
-        console.warn(`[grader] No MLB schedule match found for pick ${pick.id} (${pick.team_picked})`);
-        continue;
-      }
-
-      if (game.status?.detailedState !== 'Final') {
-        console.log(`[grader] Game not final yet for pick ${pick.id}, skipping.`);
-        continue;
-      }
-
-      const result = determineResult(game, pick.team_picked, pick.pick_type, pick.spread_point);
-      const pointsAwarded = getPointsForResult(pick.odds_at_lock, result);
-
-      const { error: updateError } = await supabase
-        .from('picks')
-        .update({ result, points_awarded: pointsAwarded })
-        .eq('id', pick.id);
-
-      if (updateError) throw updateError;
-
-      console.log(`[grader] Graded pick ${pick.id}: ${pick.team_picked} ${pick.pick_type} → ${result} (${pointsAwarded} pts)`);
-    } catch (err) {
-      console.error(`[grader] Error grading pick ${pick.id}:`, err);
     }
-  }
 
-  console.log('[grader] Grading job complete.');
+    console.log('[grader] Grading job complete.');
+  } catch (err) {
+    console.error('[grader] Fatal error in grader:', err);
+    await dmAdmin(client, `🚨 Grader failed at ${new Date().toISOString()}\nError: ${err.message}`);
+  }
 }
 
 function startGrader(client) {
-  cron.schedule('0 5 * * *', runGrader, { timezone: 'America/New_York' });
+  cron.schedule('0 5 * * *', () => runGrader(client), { timezone: 'America/New_York' });
   console.log('[grader] Scheduled daily grading job at 5:00 AM ET.');
 }
 
