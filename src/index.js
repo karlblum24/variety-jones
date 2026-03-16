@@ -8,6 +8,7 @@ const { startGrader } = require('./handlers/grader');
 const { postScoreboard, startScoreboardScheduler } = require('./handlers/scoreboard');
 const { startDailyRecap } = require('./handlers/dailyRecap');
 const { handleAdminCommand } = require('./handlers/adminHandler');
+const { startWeeklyReminder } = require('./handlers/weeklyReminder');
 const logger = require('./utils/logger');
 
 process.on('unhandledRejection', (err) => logger.error('process', 'Unhandled rejection', err));
@@ -43,6 +44,7 @@ client.once('ready', () => {
   startGrader(client);
   startScoreboardScheduler(client);
   startDailyRecap(client);
+  startWeeklyReminder(client);
 });
 
 client.on('messageCreate', async message => {
