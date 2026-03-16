@@ -33,6 +33,7 @@ function formatEastern(isoString) {
 }
 
 function getMarketOdds(game, marketKey) {
+  if (!game.bookmakers || game.bookmakers.length === 0) return null;
   for (const bookmaker of game.bookmakers) {
     const market = bookmaker.markets.find(m => m.key === marketKey);
     if (market) return market;
@@ -53,7 +54,14 @@ function buildGameListMessage(games, picksRemaining, isPreseason) {
 
   const footer = `Reply with your pick(s) in this format: [Team Name] [moneyline or spread]\nExample: Yankees moneyline, Braves spread, Cubs ml (use a comma between picks)\nYou can submit up to ${picksRemaining} pick(s) this session.\n\n⚠️ **Important:** Your pick is not confirmed until you see a confirmation message from the bot. If you do not receive a confirmation, your pick was not saved.`;
 
-  const gameBlocks = games.map((game, i) => {
+  const usableGames = games.filter(game => {
+    if (!game.bookmakers || game.bookmakers.length === 0) return false;
+    const h2h = getMarketOdds(game, 'h2h');
+    const spreads = getMarketOdds(game, 'spreads');
+    return h2h !== null || spreads !== null;
+  });
+
+  const gameBlocks = usableGames.map((game, i) => {
     const h2h = getMarketOdds(game, 'h2h');
     const spreads = getMarketOdds(game, 'spreads');
     const awayML = getTeamOdds(h2h, game.away_team);
@@ -160,9 +168,21 @@ async function handleStep0(message) {
     return;
   }
 
+  const displayGames = availableGames.filter(game => {
+    if (!game.bookmakers || game.bookmakers.length === 0) return false;
+    const h2h = getMarketOdds(game, 'h2h');
+    const spreads = getMarketOdds(game, 'spreads');
+    return h2h !== null || spreads !== null;
+  });
+
+  if (displayGames.length === 0) {
+    await message.reply('No games with available odds right now. Check back later!');
+    return;
+  }
+
   conversationState.set(userId, {
     step: 1,
-    games: availableGames,
+    games: displayGames,
     player,
     weekNumber,
     seasonYear,
@@ -170,9 +190,9 @@ async function handleStep0(message) {
     startedAt: Date.now(),
   });
 
-  logger.info(userId, 'Step 0 complete, sending game list', { games: availableGames.length, picksRemaining });
+  logger.info(userId, 'Step 0 complete, sending game list', { games: displayGames.length, picksRemaining });
 
-  const chunks = buildGameListMessage(availableGames, picksRemaining, IS_PRESEASON);
+  const chunks = buildGameListMessage(displayGames, picksRemaining, IS_PRESEASON);
   await message.reply(chunks[0]);
   for (let i = 1; i < chunks.length; i++) {
     await message.author.send(chunks[i]);

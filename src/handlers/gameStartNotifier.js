@@ -49,6 +49,14 @@ async function startGameNotifier(client) {
           .eq('id', pick.id);
       } catch (err) {
         console.error(`[notifier] Error DMing user ${discordId}:`, err);
+        try {
+          await supabase
+            .from('picks')
+            .update({ notified: true })
+            .eq('id', pick.id);
+        } catch (updateErr) {
+          console.error(`[notifier] Failed to mark pick ${pick.id} as notified after DM error:`, updateErr);
+        }
       }
     }
   }, 60 * 1000);
