@@ -1,6 +1,7 @@
 const { postScoreboard } = require('./scoreboard');
 const { postDailyRecap } = require('./dailyRecap');
 const { runGrader } = require('./grader');
+const { sendWeeklyReminders } = require('./weeklyReminder');
 const supabase = require('../database/supabase');
 
 const ADMIN_DISCORD_ID = process.env.ADMIN_DISCORD_ID;
@@ -9,6 +10,7 @@ const COMMANDS = `Admin commands:
 !admin scoreboard — post scoreboard now
 !admin recap — post daily recap now
 !admin grade — run grader now
+!admin remind — send weekly reminders to players with picks remaining
 !admin paid <username> — mark player as paid
 !admin unpaid <username> — mark player as unpaid
 !admin players — list all players with onboarding and payment status`;
@@ -34,6 +36,10 @@ async function handleAdminCommand(message, client) {
     } else if (command === 'grade') {
       await message.reply('Running grader...');
       await runGrader(client);
+      await message.reply('Done.');
+    } else if (command === 'remind') {
+      await message.reply('Sending weekly reminders...');
+      await sendWeeklyReminders(client);
       await message.reply('Done.');
     } else if (command.startsWith('paid ') || command.startsWith('unpaid ')) {
       const isPaid = command.startsWith('paid ');
