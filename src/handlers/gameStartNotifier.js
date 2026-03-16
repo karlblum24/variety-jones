@@ -1,8 +1,6 @@
 const supabase = require('../database/supabase');
 const { getPointsForResult } = require('../config/scoring');
 
-const notifiedPickIds = new Set();
-
 function formatOdds(odds) {
   return odds >= 0 ? `+${odds}` : `${odds}`;
 }
@@ -16,7 +14,8 @@ async function startGameNotifier(client) {
         .select('*, players(discord_id)')
         .is('result', null)
         .not('odds_at_lock', 'is', null)
-        .lte('game_start_time', new Date().toISOString());
+        .lte('game_start_time', new Date().toISOString())
+        .eq('notified', false);
 
       if (error) throw error;
       picks = data;
@@ -26,8 +25,6 @@ async function startGameNotifier(client) {
     }
 
     for (const pick of picks) {
-      if (notifiedPickIds.has(pick.id)) continue;
-
       const discordId = pick.players?.discord_id;
       if (!discordId) continue;
 
@@ -46,7 +43,10 @@ async function startGameNotifier(client) {
           `Good luck!`
         );
 
-        notifiedPickIds.add(pick.id);
+        await supabase
+          .from('picks')
+          .update({ notified: true })
+          .eq('id', pick.id);
       } catch (err) {
         console.error(`[notifier] Error DMing user ${discordId}:`, err);
       }

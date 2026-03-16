@@ -23,6 +23,7 @@ create table if not exists picks (
   game_start_time timestamptz,
   result          text check (result in ('win', 'loss', 'push')),
   points_awarded  decimal(6, 2),
+  notified        boolean not null default false,
   -- MIGRATION: add this column manually in Supabase:
   -- ALTER TABLE picks ADD COLUMN cancelled BOOLEAN NOT NULL DEFAULT FALSE;
   cancelled       boolean not null default false,
