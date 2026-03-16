@@ -115,7 +115,7 @@ async function postScoreboard(client) {
     }) + ' ET';
 
     const embed = new EmbedBuilder()
-      .setTitle('⚾ Variety Jones Standings')
+      .setTitle('⚾ 2026 PICKS LEAGUE Standings')
       .setColor(0x00ff00)
       .setDescription(description)
       .addFields({ name: '🎯 Longest Shot Award', value: longestShotValue })

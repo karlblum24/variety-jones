@@ -3,11 +3,11 @@ const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('postrules')
-    .setDescription('Post the Variety Jones league rules'),
+    .setDescription('Post the 2026 PICKS LEAGUE league rules'),
 
   async execute(interaction) {
     const embed = new EmbedBuilder()
-      .setTitle('📋 Variety Jones League Rules')
+      .setTitle('📋 2026 PICKS LEAGUE League Rules')
       .setColor(0x1e90ff)
       .addFields(
         {
@@ -16,7 +16,7 @@ module.exports = {
         },
         {
           name: 'How to Submit Picks',
-          value: 'DM the bot directly — find **Variety Jones at your service** in the server member list, click its name, and hit Message. The bot will show you available games and walk you through the process. Picks submitted any other way will not count.',
+          value: 'DM the bot directly — find **2026 PICKS LEAGUE at your service** in the server member list, click its name, and hit Message. The bot will show you available games and walk you through the process. Picks submitted any other way will not count.',
         },
         {
           name: 'What You Can Pick',

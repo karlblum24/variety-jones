@@ -1,4 +1,4 @@
-# Variety Jones — SUBMISSION SLAVE
+# 2026 PICKS LEAGUE — SUBMISSION SLAVE
 
 A Discord bot for a private baseball picks league. Players DM the bot to submit weekly picks on MLB games. Results are graded automatically, scores are tracked in Supabase, and a scoreboard is posted daily.
 
