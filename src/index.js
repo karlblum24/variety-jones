@@ -7,6 +7,7 @@ const { startGameNotifier } = require('./handlers/gameStartNotifier');
 const { startGrader } = require('./handlers/grader');
 const { postScoreboard, startScoreboardScheduler } = require('./handlers/scoreboard');
 const { startDailyRecap } = require('./handlers/dailyRecap');
+const { handleAdminCommand } = require('./handlers/adminHandler');
 const logger = require('./utils/logger');
 
 process.on('unhandledRejection', (err) => logger.error('process', 'Unhandled rejection', err));
@@ -45,6 +46,7 @@ client.once('ready', () => {
 
 client.on('messageCreate', async message => {
   if (message.author.bot) return;
+  await handleAdminCommand(message, client);
   if (message.channel.type !== ChannelType.DM) return;
   try {
     await handleDM(message);

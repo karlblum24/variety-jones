@@ -123,4 +123,4 @@ function startGrader(client) {
   console.log('[grader] Scheduled daily grading job at 5:00 AM ET.');
 }
 
-module.exports = { startGrader };
+module.exports = { startGrader, runGrader };
