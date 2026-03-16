@@ -13,11 +13,11 @@ const COMMANDS = `Admin commands:
 !admin unpaid <username> — mark player as unpaid`;
 
 async function handleAdminCommand(message, client) {
-  if (!ADMIN_DISCORD_ID) return;
-  if (message.author.id !== ADMIN_DISCORD_ID) return;
+  if (!ADMIN_DISCORD_ID) return false;
+  if (message.author.id !== ADMIN_DISCORD_ID) return false;
 
   const input = message.content.trim().toLowerCase();
-  if (!input.startsWith('!admin')) return;
+  if (!input.startsWith('!admin')) return false;
 
   const command = input.replace('!admin', '').trim();
 
@@ -40,7 +40,7 @@ async function handleAdminCommand(message, client) {
 
       if (!username) {
         await message.reply('Usage: !admin paid <username> or !admin unpaid <username>');
-        return;
+        return true;
       }
 
       const { data, error } = await supabase
@@ -51,12 +51,12 @@ async function handleAdminCommand(message, client) {
 
       if (error) {
         await message.reply(`DB error: ${error.message}`);
-        return;
+        return true;
       }
 
       if (!data || data.length === 0) {
         await message.reply(`No player found with username "${username}".`);
-        return;
+        return true;
       }
 
       await message.reply(`✅ **${data[0].discord_username}** marked as **${isPaid ? 'PAID' : 'UNPAID'}**.`);
@@ -65,7 +65,9 @@ async function handleAdminCommand(message, client) {
     }
   } catch (err) {
     await message.reply(`Error: ${err.message}`);
+    return true;
   }
+  return true;
 }
 
 module.exports = { handleAdminCommand };

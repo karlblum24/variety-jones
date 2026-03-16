@@ -47,7 +47,8 @@ client.once('ready', () => {
 
 client.on('messageCreate', async message => {
   if (message.author.bot) return;
-  await handleAdminCommand(message, client);
+  const handledByAdmin = await handleAdminCommand(message, client);
+  if (handledByAdmin) return;
   if (message.channel.type !== ChannelType.DM) return;
   try {
     await handleDM(message);
