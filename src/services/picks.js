@@ -67,7 +67,7 @@ async function cancelPick(pickId, playerId) {
   if (updateError) throw updateError;
 }
 
-async function submitPick(playerId, weekNumber, seasonYear, gameId, teamPicked, pickType, gameStartTime, odds) {
+async function submitPick(playerId, weekNumber, seasonYear, gameId, teamPicked, pickType, gameStartTime, odds, spreadPoint = null) {
   const { data, error } = await supabase
     .from('picks')
     .insert({
@@ -79,6 +79,7 @@ async function submitPick(playerId, weekNumber, seasonYear, gameId, teamPicked, 
       pick_type: pickType,
       game_start_time: gameStartTime,
       odds_at_lock: odds,
+      spread_point: spreadPoint,
     })
     .select()
     .single();

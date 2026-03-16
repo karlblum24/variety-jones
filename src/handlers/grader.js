@@ -30,7 +30,7 @@ function findGameInSchedule(scheduleData, teamPicked) {
   return null;
 }
 
-function determineResult(game, teamPicked, pickType) {
+function determineResult(game, teamPicked, pickType, spreadPoint) {
   const awayScore = game.teams?.away?.score;
   const homeScore = game.teams?.home?.score;
   const mlbAway = game.teams?.away?.team?.name || '';
@@ -45,8 +45,15 @@ function determineResult(game, teamPicked, pickType) {
   }
 
   if (pickType === 'spread') {
-    // TODO: improve spread grading to use the actual spread points value (currently not stored)
-    // For now, treating spread picks the same as moneyline for win/loss determination
+    if (spreadPoint !== null && spreadPoint !== undefined) {
+      // Cover if: (pickedScore - opposingScore) > -spreadPoint
+      // e.g. spreadPoint = -1.5 → must win by 2+
+      // e.g. spreadPoint = +1.5 → can lose by 1
+      const margin = pickedScore - opposingScore;
+      if (margin === -spreadPoint) return 'push';
+      return margin > -spreadPoint ? 'win' : 'loss';
+    }
+    // Fallback: no spread_point stored, grade on outright result
     return pickedScore > opposingScore ? 'win' : 'loss';
   }
 
@@ -124,7 +131,7 @@ async function runGrader() {
         continue;
       }
 
-      const result = determineResult(game, pick.team_picked, pick.pick_type);
+      const result = determineResult(game, pick.team_picked, pick.pick_type, pick.spread_point);
       const pointsAwarded = getPointsForResult(pick.odds_at_lock, result);
 
       const { error: updateError } = await supabase

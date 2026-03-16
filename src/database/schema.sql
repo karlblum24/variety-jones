@@ -19,6 +19,7 @@ create table if not exists picks (
   team_picked     text not null,
   pick_type       text not null check (pick_type in ('moneyline', 'spread')),
   odds_at_lock    integer,
+  spread_point    decimal(4,1),
   game_start_time timestamptz,
   result          text check (result in ('win', 'loss', 'push')),
   points_awarded  decimal(6, 2),

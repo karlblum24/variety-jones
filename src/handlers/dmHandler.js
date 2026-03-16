@@ -284,7 +284,8 @@ async function handleStep2(message, state) {
           pick.teamName,
           pick.pickType,
           pick.game.commence_time,
-          pick.odds
+          pick.odds,
+          pick.point
         );
       } catch (err) {
         logger.error(userId, `submitPick failed for ${pick.teamName}`, err);
