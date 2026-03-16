@@ -155,7 +155,8 @@ async function handleOnboardingVenmo(message, state) {
   await message.reply(
     `Nice to meet you, **${displayName}**! 🤝\n\n` +
     `Now what's your **Venmo handle**? (so we can pay you when you win)\n` +
-    `Just the handle — no @ needed.`
+    `Just the handle — no @ needed.\n\n` +
+    `Don't have Venmo? Reply **cash** and DM @variety in the server to coordinate payment.`
   );
 }
 
