@@ -67,7 +67,7 @@ client.on('guildMemberAdd', async (member) => {
       `• Odds lock at submission — bigger underdogs = more points\n` +
       `• Picks lock when the game starts — cancel anytime before that\n` +
       `• Grading runs automatically after games finish\n` +
-      `• Type **my picks** to se** to cancel one\n\n` +
+      `• Type **my picks** to see your picks, **cancel** to cancel one\n\n` +
       `Head to #read-me in the server for full rules and scoring info.\n\n` +
       `When you're ready to make your first picks, just DM me anything and I'll pull up the games. Let's get it. 😈`
     );
