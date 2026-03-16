@@ -10,7 +10,8 @@ const COMMANDS = `Admin commands:
 !admin recap — post daily recap now
 !admin grade — run grader now
 !admin paid <username> — mark player as paid
-!admin unpaid <username> — mark player as unpaid`;
+!admin unpaid <username> — mark player as unpaid
+!admin players — list all players with onboarding and payment status`;
 
 async function handleAdminCommand(message, client) {
   if (!ADMIN_DISCORD_ID) return false;
@@ -60,6 +61,44 @@ async function handleAdminCommand(message, client) {
       }
 
       await message.reply(`✅ **${data[0].discord_username}** marked as **${isPaid ? 'PAID' : 'UNPAID'}**.`);
+    } else if (command === 'players') {
+      const { data, error } = await supabase
+        .from('players')
+        .select('discord_username, display_name, venmo_handle, has_paid')
+        .order('discord_username', { ascending: true });
+
+      if (error) {
+        await message.reply(`DB error: ${error.message}`);
+        return true;
+      }
+
+      if (!data || data.length === 0) {
+        await message.reply('No players found.');
+        return true;
+      }
+
+      const lines = data.map(p => {
+        const name = p.display_name || '❌ no name';
+        const venmo = p.venmo_handle || '❌ no venmo';
+        const paid = p.has_paid ? '✅ paid' : '💰 unpaid';
+        return `**${p.discord_username}** — ${name} | @${venmo} | ${paid}`;
+      });
+
+      const chunks = [];
+      let current = '';
+      for (const line of lines) {
+        if (current.length + line.length + 1 > 1900) {
+          chunks.push(current);
+          current = line;
+        } else {
+          current += (current ? '\n' : '') + line;
+        }
+      }
+      if (current) chunks.push(current);
+
+      for (const chunk of chunks) {
+        await message.reply(chunk);
+      }
     } else {
       await message.reply(COMMANDS);
     }
