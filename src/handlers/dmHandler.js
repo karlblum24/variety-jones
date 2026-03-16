@@ -84,7 +84,7 @@ function buildGameListMessage(games, picksRemaining, isPreseason) {
   let current = header;
 
   for (const block of gameBlocks) {
-    if (current.length + block.length > 1900) {
+    if (current.length + block.length > 1800) {
       chunks.push(current);
       current = block;
     } else {
@@ -556,7 +556,7 @@ async function handleShowPicks(message) {
   let current = '';
 
   for (const block of blocks) {
-    if (current.length + block.length > 1900) {
+    if (current.length + block.length > 1800) {
       chunks.push(current);
       current = block;
     } else {
