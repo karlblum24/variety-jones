@@ -24,7 +24,7 @@ async function getOrCreatePlayer(discordId, discordUsername) {
     .single();
 
   if (error) throw error;
-  return created;
+  return { ...created, isNew: true };
 }
 
 async function getPicksThisWeek(playerId, weekNumber, seasonYear) {

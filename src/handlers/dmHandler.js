@@ -135,6 +135,20 @@ async function handleStep0(message) {
 
   const player = await getOrCreatePlayer(message.author.id, message.author.username);
 
+  if (player.isNew) {
+    await message.reply(
+      `👋 Welcome to the **2026 PICKS LEAGUE**, big shot!\n\n` +
+      `Here's how it works:\n` +
+      `• Each week you get **3 picks** on MLB games\n` +
+      `• Pick a team **moneyline** (win outright) or **spread** (cover the run line)\n` +
+      `• Odds are locken — bigger underdogs = more points\n` +
+      `• Picks lock when the game starts — cancel anytime before that\n` +
+      `• Grading happens automatically after games finish\n` +
+      `• Type **my picks** to see your picks, **cancel** to cancel one\n\n` +
+      `Now let's get you some games to pick from... 👇`
+    );
+  }
+
   const now = new Date();
   const weekNumber = getISOWeek(now);
   const seasonYear = now.getFullYear();
