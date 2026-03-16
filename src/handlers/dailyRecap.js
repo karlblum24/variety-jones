@@ -25,7 +25,7 @@ async function buildRecapData() {
   // Fetch yesterday's graded picks with player info
   const { data: yesterdayPicks, error: yesterdayError } = await supabase
     .from('picks')
-    .select('*, players(discord_username)')
+    .select('*, players(discord_username, discord_id)')
     .not('result', 'is', null)
     .gte('game_start_time', yesterdayMidnightET.toISOString())
     .lt('game_start_time', todayMidnightET.toISOString());
@@ -35,7 +35,7 @@ async function buildRecapData() {
   // Fetch all graded picks for league standings
   const { data: allPicks, error: allError } = await supabase
     .from('picks')
-    .select('player_id, points_awarded, players(discord_username)')
+    .select('player_id, points_awarded, players(discord_username, discord_id)')
     .not('result', 'is', null);
 
   if (allError) throw allError;
@@ -47,10 +47,11 @@ async function buildRecapData() {
   // Aggregate yesterday's points per player
   const yesterdayTotals = {};
   for (const pick of yesterdayPicks) {
+    const id = pick.players?.discord_id;
     const name = pick.players?.discord_username || 'Unknown';
-    if (!yesterdayTotals[name]) yesterdayTotals[name] = { points: 0, picks: [] };
-    yesterdayTotals[name].points += Number(pick.points_awarded || 0);
-    yesterdayTotals[name].picks.push(pick);
+    if (!yesterdayTotals[id]) yesterdayTotals[id] = { name, points: 0, picks: [] };
+    yesterdayTotals[id].points += Number(pick.points_awarded || 0);
+    yesterdayTotals[id].picks.push(pick);
   }
 
   // Top scorer yesterday
@@ -70,11 +71,13 @@ async function buildRecapData() {
   // League standings
   const seasonTotals = {};
   for (const pick of allPicks || []) {
+    const id = pick.players?.discord_id;
     const name = pick.players?.discord_username || 'Unknown';
-    seasonTotals[name] = (seasonTotals[name] || 0) + Number(pick.points_awarded || 0);
+    if (!seasonTotals[id]) seasonTotals[id] = { name, points: 0 };
+    seasonTotals[id].points += Number(pick.points_awarded || 0);
   }
   const leagueLeader = Object.entries(seasonTotals)
-    .sort((a, b) => b[1] - a[1])[0];
+    .sort((a, b) => b[1].points - a[1].points)[0];
 
   return {
     date: yesterdayMidnightET.toLocaleDateString('en-US', {
@@ -85,19 +88,21 @@ async function buildRecapData() {
     }),
     isPreseason: IS_PRESEASON,
     topScorerYesterday: topScorerYesterday
-      ? { name: topScorerYesterday[0], points: topScorerYesterday[1].points }
+      ? { mention: `<@${topScorerYesterday[0]}>`, name: topScorerYesterday[1].name, points: topScorerYesterday[1].points }
       : null,
-    yesterdayPlayerSummaries: Object.entries(yesterdayTotals).map(([name, data]) => ({
-      name,
+    yesterdayPlayerSummaries: Object.entries(yesterdayTotals).map(([id, data]) => ({
+      mention: `<@${id}>`,
+      name: data.name,
       points: data.points,
       wins: data.picks.filter(p => p.result === 'win').length,
       losses: data.picks.filter(p => p.result === 'loss').length,
     })),
     leagueLeader: leagueLeader
-      ? { name: leagueLeader[0], points: leagueLeader[1] }
+      ? { mention: `<@${leagueLeader[0]}>`, name: leagueLeader[1].name, points: leagueLeader[1].points }
       : null,
     longShotWin: longShotWin
       ? {
+          mention: `<@${longShotWin.players?.discord_id}>`,
           name: longShotWin.players?.discord_username,
           team: longShotWin.team_picked,
           odds: formatOdds(longShotWin.odds_at_lock),
@@ -106,6 +111,7 @@ async function buildRecapData() {
       : null,
     badDay: badDayPick
       ? {
+          mention: `<@${badDayPick.players?.discord_id}>`,
           name: badDayPick.players?.discord_username,
           team: badDayPick.team_picked,
           odds: formatOdds(badDayPick.odds_at_lock),
@@ -124,6 +130,7 @@ you are extra, and you treat every pick result like it's life or death.
 You are equal parts sports commentator and reality TV villain.
 Write the daily recap for yesterday's results in this voice — one flowing
 message, no bullet points or headers. Be specific about names and numbers.
+Use the mention field (e.g. <@123456789>) instead of the name field whenever referring to a specific player so they get pinged in Discord.
 Flirt with whoever is leading the league. Absolutely destroy anyone who
 lost a heavy favorite. End with a flirty, dramatic hype line for today's
 games directed at the whole league. Keep it under 1800 characters.
