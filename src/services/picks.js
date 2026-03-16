@@ -7,7 +7,15 @@ async function getOrCreatePlayer(discordId, discordUsername) {
     .eq('discord_id', discordId)
     .maybeSingle();
 
-  if (existing) return existing;
+  if (existing) {
+    if (existing.discord_username !== discordUsername) {
+      await supabase
+        .from('players')
+        .update({ discord_username: discordUsername })
+        .eq('id', existing.id);
+    }
+    return { ...existing, discord_username: discordUsername };
+  }
 
   const { data: created, error } = await supabase
     .from('players')
