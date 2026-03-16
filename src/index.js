@@ -18,6 +18,7 @@ const client = new Client({
     GatewayIntentBits.Guilds,
     GatewayIntentBits.DirectMessages,
     GatewayIntentBits.MessageContent,
+    GatewayIntentBits.GuildMembers,
   ],
   partials: [Partials.Channel],
 });
@@ -53,6 +54,26 @@ client.on('messageCreate', async message => {
   } catch (err) {
     logger.error('index', 'handleDM threw', err);
     try { await message.reply('Something went wrong. Please try again.'); } catch (_) {}
+  }
+});
+
+client.on('guildMemberAdd', async (member) => {
+  try {
+    await member.send(
+      `👋 **Welcome to the 2026 PICKS LEAGUE, big shot!**\n\n` +
+      `I'm SUBMISSION SLAVE, your picks league bot. Here's the deal:\n\n` +
+      `• Each week you get **3 picks** on MLB games\n` +
+      `• Pick a team **moneyline** (win outright) or **spread** (cover the run line)\n` +
+      `• Odds lock at submission — bigger underdogs = more points\n` +
+      `• Picks lock when the game starts — cancel anytime before that\n` +
+      `• Grading runs automatically after games finish\n` +
+      `• Type **my picks** to se** to cancel one\n\n` +
+      `Head to #read-me in the server for full rules and scoring info.\n\n` +
+      `When you're ready to make your first picks, just DM me anything and I'll pull up the games. Let's get it. 😈`
+    );
+    logger.info('guildMemberAdd', `Welcomed new member ${member.user.username}`);
+  } catch (err) {
+    logger.error('guildMemberAdd', `Failed to DM new member ${member.user.username}`, err);
   }
 });
 
