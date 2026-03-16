@@ -3,11 +3,11 @@ const { EmbedBuilder } = require('discord.js');
 const supabase = require('../database/supabase');
 
 const GENERAL_CHANNEL_ID = process.env.GENERAL_CHANNEL_ID;
-const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
+const ANTHROPIC_API_KEY = process.env.ANTHROPIC_KEY;
 const IS_PRESEASON = process.env.IS_PRESEASON === 'true';
 
 if (!GENERAL_CHANNEL_ID) throw new Error('Missing env var: GENERAL_CHANNEL_ID');
-if (!ANTHROPIC_API_KEY) throw new Error('Missing env var: ANTHROPIC_API_KEY');
+if (!ANTHROPIC_API_KEY) throw new Error('Missing env var: ANTHROPIC_KEY');
 
 function formatOdds(odds) {
   return odds >= 0 ? `+${odds}` : `${odds}`;
