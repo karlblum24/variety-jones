@@ -39,7 +39,6 @@ client.once('ready', () => {
   logger.info('index', `Logged in as ${client.user.tag}`);
   startGameNotifier(client);
   startGrader(client);
-  postScoreboard(client);
   startScoreboardScheduler(client);
   startDailyRecap(client);
 });
