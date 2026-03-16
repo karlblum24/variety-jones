@@ -79,11 +79,14 @@ async function sendWeeklyReminders(client) {
 }
 
 function startWeeklyReminder(client) {
-  // Every Sunday at 10:00 AM ET
+  // Every Saturday and Sunday at 10:00 AM ET
+  cron.schedule('0 10 * * 6', () => sendWeeklyReminders(client), {
+    timezone: 'America/New_York',
+  });
   cron.schedule('0 10 * * 0', () => sendWeeklyReminders(client), {
     timezone: 'America/New_York',
   });
-  console.log('[weeklyReminder] Scheduled reminder at 10:00 AM ET.');
+  console.log('[weeklyReminder] Scheduled Saturday and Sunday reminders at 10:00 AM ET.');
 }
 
 module.exports = { startWeeklyReminder, sendWeeklyReminders };
