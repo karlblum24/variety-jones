@@ -41,6 +41,7 @@ function determineResult(game, teamPicked, pickType, spreadPoint) {
   const opposingScore = isHome ? awayScore : homeScore;
 
   if (pickType === 'moneyline') {
+    if (pickedScore === opposingScore) return 'push';
     return pickedScore > opposingScore ? 'win' : 'loss';
   }
 
@@ -80,6 +81,7 @@ async function runGrader(client = null) {
       .select('*')
       .is('result', null)
       .not('odds_at_lock', 'is', null)
+      .eq('cancelled', false)
       .lt('game_start_time', new Date().toISOString());
 
     if (error) throw error;

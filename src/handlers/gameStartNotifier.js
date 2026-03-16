@@ -15,7 +15,8 @@ async function startGameNotifier(client) {
         .is('result', null)
         .not('odds_at_lock', 'is', null)
         .lte('game_start_time', new Date().toISOString())
-        .eq('notified', false);
+        .eq('notified', false)
+        .eq('cancelled', false);
 
       if (error) throw error;
       picks = data;

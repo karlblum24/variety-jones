@@ -6,6 +6,7 @@ create table if not exists players (
   id              uuid primary key default gen_random_uuid(),
   discord_id      text unique not null,
   discord_username text not null,
+  has_paid        boolean not null default false,
   display_name    text,
   venmo_handle    text,
   created_at      timestamptz default now()
@@ -26,8 +27,6 @@ create table if not exists picks (
   result          text check (result in ('win', 'loss', 'push')),
   points_awarded  decimal(6, 2),
   notified        boolean not null default false,
-  -- MIGRATION: add this column manually in Supabase:
-  -- ALTER TABLE picks ADD COLUMN cancelled BOOLEAN NOT NULL DEFAULT FALSE;
   cancelled       boolean not null default false,
   created_at      timestamptz default now()
 );

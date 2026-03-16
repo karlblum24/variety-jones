@@ -32,7 +32,7 @@ async function handleAdminCommand(message, client) {
       await message.reply('Done.');
     } else if (command === 'grade') {
       await message.reply('Running grader...');
-      await runGrader();
+      await runGrader(client);
       await message.reply('Done.');
     } else if (command.startsWith('paid ') || command.startsWith('unpaid ')) {
       const isPaid = command.startsWith('paid ');

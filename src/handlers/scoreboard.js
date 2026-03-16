@@ -30,6 +30,7 @@ async function postScoreboard(client) {
       .from('picks')
       .select('player_id, team_picked, odds_at_lock, points_awarded, players(discord_username)')
       .eq('result', 'win')
+      .eq('cancelled', false)
       .not('odds_at_lock', 'is', null)
       .order('odds_at_lock', { ascending: false })
       .limit(1);
@@ -48,7 +49,7 @@ async function postScoreboard(client) {
     ] = await Promise.all([
       supabase.from('players').select('id, discord_username'),
       supabase.from('picks').select('player_id, points_awarded, week_number, season_year').not('result', 'is', null),
-      supabase.from('picks').select('player_id').eq('week_number', weekNumber).eq('season_year', seasonYear),
+      supabase.from('picks').select('player_id').eq('week_number', weekNumber).eq('season_year', seasonYear).eq('cancelled', false),
       longestShotQuery,
     ]);
 
