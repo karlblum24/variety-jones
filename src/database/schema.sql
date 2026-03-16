@@ -6,6 +6,8 @@ create table if not exists players (
   id              uuid primary key default gen_random_uuid(),
   discord_id      text unique not null,
   discord_username text not null,
+  display_name    text,
+  venmo_handle    text,
   created_at      timestamptz default now()
 );
 

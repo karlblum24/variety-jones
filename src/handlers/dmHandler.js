@@ -123,6 +123,76 @@ function getOpponent(game, teamName) {
   return game.home_team === teamName ? game.away_team : game.home_team;
 }
 
+async function handleOnboardingName(message) {
+  const userId = message.author.id;
+  conversationState.set(userId, {
+    step: 'onboarding_name',
+    startedAt: Date.now(),
+  });
+  await message.reply(
+    `👋 **Welcome to the 2026 PICKS LEAGUE!**\n\n` +
+    `Before we get started I need a couple things from you.\n\n` +
+    `First — what's your **first and last name**?`
+  );
+}
+
+async function handleOnboardingVenmo(message, state) {
+  const userId = message.author.id;
+  const displayName = message.content.trim();
+
+  if (displayName.length < 2 || displayName.length > 50) {
+    await message.reply('Please enter a valid name (2-50 characters).');
+    return;
+  }
+
+  conversationState.set(userId, {
+    ...state,
+    step: 'onboarding_venmo',
+    displayName,
+    startedAt: Date.now(),
+  });
+
+  await message.reply(
+    `Nice to meet you, **${displayName}**! 🤝\n\n` +
+    `Now what's your **Venmo handle**? (so we can pay you when you win)\n` +
+    `Just the handle — no @ needed.`
+  );
+}
+
+async function handleOnboardingComplete(message, state) {
+  const userId = message.author.id;
+  const venmoHandle = message.content.trim().replace(/^@/, '');
+
+  if (venmoHandle.length < 1 || venmoHandle.length > 50) {
+    await message.reply('Please enter a valid Venmo handle.');
+    return;
+  }
+
+  const { error } = await supabase
+    .from('players')
+    .update({
+      display_name: state.displayName,
+      venmo_handle: venmoHandle,
+    })
+    .eq('discord_id', userId);
+
+  if (error) {
+    logger.error(userId, 'Failed to save onboarding data', error);
+    await message.reply('Something went wrong saving your info. Please try again.');
+    conversationState.delete(userId);
+    return;
+  }
+
+  conversationState.delete(userId);
+  logger.info(userId, 'Onboarding complete', { displayName: state.displayName, venmoHandle });
+
+  await message.reply(
+    `You're all set, **${state.displayName}**! Let's get you some games to pick 👇`
+  );
+
+  await handleStep0(message);
+}
+
 async function handleStep0(message) {
   const userId = message.author.id;
 
@@ -134,6 +204,11 @@ async function handleStep0(message) {
   }
 
   const player = await getOrCreatePlayer(message.author.id, message.author.username);
+
+  if (!player.display_name || !player.venmo_handle) {
+    await handleOnboardingName(message);
+    return;
+  }
 
   if (player.isNew) {
     await message.reply(
@@ -536,6 +611,10 @@ async function handleDM(message) {
       await handleStep1(message, state);
     } else if (state.step === 2) {
       await handleStep2(message, state);
+    } else if (state.step === 'onboarding_name') {
+      await handleOnboardingVenmo(message, state);
+    } else if (state.step === 'onboarding_venmo') {
+      await handleOnboardingComplete(message, state);
     } else if (state.step === 'cancel_confirm') {
       await handleCancelConfirm(message, state);
     } else if (state.step === 'cancel_final') {
