@@ -3,7 +3,8 @@ const { EmbedBuilder } = require('discord.js');
 const supabase = require('../database/supabase');
 const { picksPerWeek } = require('../config/scoring');
 
-const SCOREBOARD_CHANNEL_ID = '1481844003509895350';
+const SCOREBOARD_CHANNEL_ID = process.env.SCOREBOARD_CHANNEL_ID;
+if (!SCOREBOARD_CHANNEL_ID) throw new Error('Missing env var: SCOREBOARD_CHANNEL_ID');
 const IS_PRESEASON = process.env.IS_PRESEASON === 'true';
 const HALF_CUTOFF = new Date('2026-07-14');
 
