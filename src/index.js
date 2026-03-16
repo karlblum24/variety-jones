@@ -72,6 +72,7 @@ client.on('guildMemberAdd', async (member) => {
       `• Grading runs automatically after games finish\n` +
       `• Type **my picks** to see your picks, **cancel** to cancel one\n\n` +
       `Head to #read-me in the server for full rules and scoring info.\n\n` +
+      `💰 **Entry fee:** Send $300 to **@kblum24** on Venmo to lock in your spot.\n\n` +
       `When you're ready to make your first picks, just DM me anything and I'll pull up the games. Let's get it. 😈`
     );
     logger.info('guildMemberAdd', `Welcomed new member ${member.user.username}`);
