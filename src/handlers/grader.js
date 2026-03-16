@@ -60,38 +60,6 @@ function determineResult(game, teamPicked, pickType, spreadPoint) {
   return 'loss';
 }
 
-async function updateWeeklyScores(playerId, weekNumber, seasonYear, pointsAwarded) {
-  const { data: existing } = await supabase
-    .from('weekly_scores')
-    .select('*')
-    .eq('player_id', playerId)
-    .eq('week_number', weekNumber)
-    .eq('season_year', seasonYear)
-    .maybeSingle();
-
-  if (existing) {
-    const { error } = await supabase
-      .from('weekly_scores')
-      .update({
-        total_points: Number(existing.total_points) + pointsAwarded,
-        picks_submitted: existing.picks_submitted + 1,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', existing.id);
-    if (error) throw error;
-  } else {
-    const { error } = await supabase
-      .from('weekly_scores')
-      .insert({
-        player_id: playerId,
-        week_number: weekNumber,
-        season_year: seasonYear,
-        total_points: pointsAwarded,
-        picks_submitted: 1,
-      });
-    if (error) throw error;
-  }
-}
 
 async function runGrader() {
   console.log('[grader] Running daily grading job...');
@@ -140,8 +108,6 @@ async function runGrader() {
         .eq('id', pick.id);
 
       if (updateError) throw updateError;
-
-      await updateWeeklyScores(pick.player_id, pick.week_number, pick.season_year, pointsAwarded);
 
       console.log(`[grader] Graded pick ${pick.id}: ${pick.team_picked} ${pick.pick_type} → ${result} (${pointsAwarded} pts)`);
     } catch (err) {

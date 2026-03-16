@@ -30,14 +30,3 @@ create table if not exists picks (
   created_at      timestamptz default now()
 );
 
--- Weekly Scores
-create table if not exists weekly_scores (
-  id               uuid primary key default gen_random_uuid(),
-  player_id        uuid not null references players(id) on delete cascade,
-  week_number      integer not null,
-  season_year      integer not null,
-  total_points     decimal(8, 2) not null default 0,
-  picks_submitted  integer not null default 0,
-  updated_at       timestamptz default now(),
-  unique (player_id, week_number, season_year)
-);
