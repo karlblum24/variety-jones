@@ -6,6 +6,11 @@ const { handleDM } = require('./handlers/dmHandler');
 const { startGameNotifier } = require('./handlers/gameStartNotifier');
 const { startGrader } = require('./handlers/grader');
 const { postScoreboard, startScoreboardScheduler } = require('./handlers/scoreboard');
+const { startDailyRecap } = require('./handlers/dailyRecap');
+const logger = require('./utils/logger');
+
+process.on('unhandledRejection', (err) => logger.error('process', 'Unhandled rejection', err));
+process.on('uncaughtException', (err) => { logger.error('process', 'Uncaught exception', err); });
 
 const client = new Client({
   intents: [
@@ -26,22 +31,28 @@ for (const file of commandFiles) {
   if (command.data && command.execute) {
     client.commands.set(command.data.name, command);
   } else {
-    console.warn(`[warn] ${file} is missing "data" or "execute"`);
+    logger.warn('index', `${file} is missing "data" or "execute"`);
   }
 }
 
 client.once('ready', () => {
-  console.log(`Logged in as ${client.user.tag}`);
+  logger.info('index', `Logged in as ${client.user.tag}`);
   startGameNotifier(client);
   startGrader(client);
   postScoreboard(client);
   startScoreboardScheduler(client);
+  startDailyRecap(client);
 });
 
 client.on('messageCreate', async message => {
   if (message.author.bot) return;
   if (message.channel.type !== ChannelType.DM) return;
-  await handleDM(message);
+  try {
+    await handleDM(message);
+  } catch (err) {
+    logger.error('index', 'handleDM threw', err);
+    try { await message.reply('Something went wrong. Please try again.'); } catch (_) {}
+  }
 });
 
 client.on('interactionCreate', async interaction => {
@@ -53,7 +64,7 @@ client.on('interactionCreate', async interaction => {
   try {
     await command.execute(interaction);
   } catch (error) {
-    console.error(error);
+    logger.error('index', `Command "${interaction.commandName}" failed`, error);
     const reply = { content: 'An error occurred while executing that command.', ephemeral: true };
     if (interaction.replied || interaction.deferred) {
       await interaction.followUp(reply);
