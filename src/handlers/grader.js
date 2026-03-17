@@ -13,6 +13,7 @@ async function fetchMLBSchedule(date, gameType) {
 }
 
 function normalizeTeamName(name) {
+  if (!name) return '';
   return name.toLowerCase().trim()
     .replace(/\./g, '')           // remove periods (A.L., etc)
     .replace(/\s+/g, ' ');        // normalize whitespace
