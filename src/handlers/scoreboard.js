@@ -133,7 +133,7 @@ async function postScoreboard(client) {
 
 function startScoreboardScheduler(client) {
   cron.schedule('5 6 * * *', () => postScoreboard(client), { timezone: 'America/New_York' });
-  console.log('[scoreboard] Schey scoreboard post at 6:05 AM ET.');
+  console.log('[scoreboard] Scheduled daily scoreboard post at 6:05 AM ET.');
 }
 
 module.exports = { postScoreboard, startScoreboardScheduler };
