@@ -13,8 +13,31 @@ async function fetchMLBSchedule(date, gameType) {
 }
 
 function fuzzyMatchTeam(mlbTeamName, ourTeamName) {
-  const lastWord = ourTeamName.trim().split(' ').pop().toLowerCase();
-  return mlbTeamName.toLowerCase().includes(lastWord);
+  const mlb = mlbTeamName.toLowerCase().trim();
+  const our = ourTeamName.toLowerCase().trim();
+
+  // Strategy 1: exact match
+  if (mlb === our) return true;
+
+  // Strategy 2: mlb name contains our full team name
+  if (mlb.includes(our)) return true;
+
+  // Strategy 3: our name contains mlb team name
+  if (our.includes(mlb)) return true;
+
+  // Strategy 4: all words in our name appear in mlb name
+  const ourWords = our.split(' ').filter(w => w.length > 2);
+  if (ourWords.length > 1 && ourWords.every(w => mlb.includes(w))) return true;
+
+  // Strategy 5: last word match (fallback only for single-word nicknames)
+  // Only use if our team name is a single word to avoid Sox/Red Sox collision
+  const ourWordCount = our.trim().split(' ').length;
+  if (ourWordCount === 1) {
+    const lastWord = our.split(' ').pop();
+    if (mlb.includes(lastWord)) return true;
+  }
+
+  return false;
 }
 
 function findGameInSchedule(scheduleData, teamPicked) {
