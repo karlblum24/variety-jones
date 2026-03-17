@@ -125,6 +125,20 @@ async function runGrader(client = null) {
       }
     }
 
+    const staleThreshold = new Date(Date.now() - 18 * 60 * 60 * 1000);
+    const stalePicks = picks.filter(p =>
+      p.result === null &&
+      new Date(p.game_start_time) < staleThreshold
+    );
+    if (stalePicks.length > 0) {
+      const staleList = stalePicks.map(p =>
+        `• ${p.team_picked} (${p.pick_type}) — started ${new Date(p.game_start_time).toLocaleString('en-US', { timeZone: 'America/New_York' })} ET`
+      ).join('\n');
+      await dmAdmin(client,
+        `⚠️ ${stalePicks.length} pick(s) still ungraded 18+ hours after game start:\n\n${staleList}\n\nCheck MLB Stats API or grade manually in Supabase.`
+      );
+    }
+
     console.log('[grader] Grading job complete.');
   } catch (err) {
     console.error('[grader] Fatal error in grader:', err);
@@ -133,8 +147,10 @@ async function runGrader(client = null) {
 }
 
 function startGrader(client) {
-  cron.schedule('0 5 * * *', () => runGrader(client), { timezone: 'America/New_York' });
-  console.log('[grader] Scheduled daily grading job at 5:00 AM ET.');
+  cron.schedule('0 6 * * *', () => runGrader(client), { timezone: 'America/New_York' });
+  console.log('[grader] Scheduled daily grading job at 6:00 AM ET.');
+  cron.schedule('0 12 * * *', () => runGrader(client), { timezone: 'America/New_York' });
+  console.log('[grader] Scheduled catch-up grading job at 12:00 PM ET.');
 }
 
 module.exports = { startGrader, runGrader };
