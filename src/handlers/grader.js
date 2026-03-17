@@ -12,41 +12,52 @@ async function fetchMLBSchedule(date, gameType) {
   return res.json();
 }
 
-function fuzzyMatchTeam(mlbTeamName, ourTeamName) {
-  const mlb = mlbTeamName.toLowerCase().trim();
-  const our = ourTeamName.toLowerCase().trim();
+function normalizeTeamName(name) {
+  return name.toLowerCase().trim()
+    .replace(/\./g, '')           // remove periods (A.L., etc)
+    .replace(/\s+/g, ' ');        // normalize whitespace
+}
 
-  // Strategy 1: exact match
-  if (mlb === our) return true;
+function teamsMatch(mlbName, oddsName) {
+  const mlb = normalizeTeamName(mlbName);
+  const odds = normalizeTeamName(oddsName);
 
-  // Strategy 2: mlb name contains our full team name
-  if (mlb.includes(our)) return true;
+  // Exact match
+  if (mlb === odds) return true;
 
-  // Strategy 3: our name contains mlb team name
-  if (our.includes(mlb)) return true;
+  // One contains the other
+  if (mlb.includes(odds) || odds.includes(mlb)) return true;
 
-  // Strategy 4: all words in our name appear in mlb name
-  const ourWords = our.split(' ').filter(w => w.length > 2);
-  if (ourWords.length > 1 && ourWords.every(w => mlb.includes(w))) return true;
-
-  // Strategy 5: last word match (fallback only for single-word nicknames)
-  // Only use if our team name is a single word to avoid Sox/Red Sox collision
-  const ourWordCount = our.trim().split(' ').length;
-  if (ourWordCount === 1) {
-    const lastWord = our.split(' ').pop();
-    if (mlb.includes(lastWord)) return true;
-  }
+  // All significant words in oddsName appear in mlbName
+  const oddsWords = odds.split(' ').filter(w => w.length > 2);
+  if (oddsWords.length > 0 && oddsWords.every(w => mlb.includes(w))) return true;
 
   return false;
 }
 
-function findGameInSchedule(scheduleData, teamPicked) {
+function findGameInSchedule(scheduleData, homeTeam, awayTeam) {
   for (const date of scheduleData.dates || []) {
     for (const game of date.games || []) {
       const mlbAway = game.teams?.away?.team?.name || '';
       const mlbHome = game.teams?.home?.team?.name || '';
-      if (fuzzyMatchTeam(mlbAway, teamPicked) || fuzzyMatchTeam(mlbHome, teamPicked)) {
-        return game;
+
+      // Match using both teams if available
+      if (homeTeam && awayTeam) {
+        if (teamsMatch(mlbHome, homeTeam) && teamsMatch(mlbAway, awayTeam)) {
+          return game;
+        }
+        // Try reversed (in case home/away is swapped in one API)
+        if (teamsMatch(mlbHome, awayTeam) && teamsMatch(mlbAway, homeTeam)) {
+          return game;
+        }
+      }
+
+      // Fallback: single team match if home/away not stored
+      if (!homeTeam || !awayTeam) {
+        const teamToFind = homeTeam || awayTeam;
+        if (teamsMatch(mlbAway, teamToFind) || teamsMatch(mlbHome, teamToFind)) {
+          return game;
+        }
       }
     }
   }
@@ -59,7 +70,7 @@ function determineResult(game, teamPicked, pickType, spreadPoint) {
   const mlbAway = game.teams?.away?.team?.name || '';
   const mlbHome = game.teams?.home?.team?.name || '';
 
-  const isHome = fuzzyMatchTeam(mlbHome, teamPicked);
+  const isHome = teamsMatch(mlbHome, teamPicked);
   const pickedScore = isHome ? homeScore : awayScore;
   const opposingScore = isHome ? awayScore : homeScore;
 
@@ -115,11 +126,21 @@ async function runGrader(client = null) {
       try {
         const gameDate = new Date(pick.game_start_time);
         let scheduleData = await fetchMLBSchedule(gameDate, 'S');
-        let game = findGameInSchedule(scheduleData, pick.team_picked);
+        let game = findGameInSchedule(scheduleData, pick.home_team, pick.away_team);
 
         if (!game) {
           scheduleData = await fetchMLBSchedule(gameDate, 'R');
-          game = findGameInSchedule(scheduleData, pick.team_picked);
+          game = findGameInSchedule(scheduleData, pick.home_team, pick.away_team);
+        }
+
+        // Fallback for old picks without home_team/away_team stored
+        if (!game && pick.team_picked) {
+          scheduleData = await fetchMLBSchedule(gameDate, 'S');
+          game = findGameInSchedule(scheduleData, null, pick.team_picked);
+          if (!game) {
+            scheduleData = await fetchMLBSchedule(gameDate, 'R');
+            game = findGameInSchedule(scheduleData, null, pick.team_picked);
+          }
         }
 
         if (!game) {
@@ -127,8 +148,22 @@ async function runGrader(client = null) {
           continue;
         }
 
-        if (game.status?.detailedState !== 'Final') {
-          console.log(`[grader] Game not final yet for pick ${pick.id}, skipping.`);
+        const state = game.status?.detailedState;
+        const TERMINAL_STATES = ['Final', 'Completed Early', 'Game Over'];
+        const VOID_STATES = ['Cancelled', 'Postponed', 'Suspended'];
+
+        if (VOID_STATES.includes(state)) {
+          const { error: voidError } = await supabase
+            .from('picks')
+            .update({ result: 'void', points_awarded: 0 })
+            .eq('id', pick.id);
+          if (voidError) throw voidError;
+          console.log(`[grader] Voided pick ${pick.id}: ${pick.team_picked} — game ${state}`);
+          continue;
+        }
+
+        if (!TERMINAL_STATES.includes(state)) {
+          console.log(`[grader] Game not final yet for pick ${pick.id} (${state}), skipping.`);
           continue;
         }
 

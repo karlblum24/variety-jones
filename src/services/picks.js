@@ -34,7 +34,8 @@ async function getPicksThisWeek(playerId, weekNumber, seasonYear) {
     .eq('player_id', playerId)
     .eq('week_number', weekNumber)
     .eq('season_year', seasonYear)
-    .eq('cancelled', false);
+    .eq('cancelled', false)
+    .or('result.is.null,result.neq.void');
 
   if (error) throw error;
   return data;
@@ -75,7 +76,7 @@ async function cancelPick(pickId, playerId) {
   if (updateError) throw updateError;
 }
 
-async function submitPick(playerId, weekNumber, seasonYear, gameId, teamPicked, pickType, gameStartTime, odds, spreadPoint = null) {
+async function submitPick(playerId, weekNumber, seasonYear, gameId, teamPicked, pickType, gameStartTime, odds, spreadPoint = null, homeTeam = null, awayTeam = null) {
   const { data, error } = await supabase
     .from('picks')
     .insert({
@@ -88,6 +89,8 @@ async function submitPick(playerId, weekNumber, seasonYear, gameId, teamPicked, 
       game_start_time: gameStartTime,
       odds_at_lock: odds,
       spread_point: spreadPoint,
+      home_team: homeTeam,
+      away_team: awayTeam,
     })
     .select()
     .single();
