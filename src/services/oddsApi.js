@@ -1,6 +1,16 @@
 const ODDS_API_BASE = 'https://api.the-odds-api.com/v4';
+const CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
+
+let cachedGames = null;
+let cacheTimestamp = null;
 
 async function getMLBGames() {
+  // Return cached response if still fresh
+  if (cachedGames && cacheTimestamp && (Date.now() - cacheTimestamp < CACHE_TTL_MS)) {
+    console.log(`[oddsApi] Returning cached games (${cachedGames.length} games, cached ${Math.round((Date.now() - cacheTimestamp) / 1000)}s ago)`);
+    return cachedGames;
+  }
+
   const params = new URLSearchParams({
     apiKey: process.env.ODDS_API_KEY,
     regions: 'us',
@@ -27,10 +37,23 @@ async function getMLBGames() {
   );
 
   const now = new Date();
-  return results
+  const games = results
     .flat()
     .filter(g => new Date(g.commence_time) > now)
     .sort((a, b) => new Date(a.commence_time) - new Date(b.commence_time));
+
+  // Update cache
+  cachedGames = games;
+  cacheTimestamp = Date.now();
+  console.log(`[oddsApi] Fetched and cached ${games.length} games from API`);
+
+  return games;
 }
 
-module.exports = { getMLBGames };
+function clearOddsCache() {
+  cachedGames = null;
+  cacheTimestamp = null;
+  console.log('[oddsApi] Odds cache cleared');
+}
+
+module.exports = { getMLBGames, clearOddsCache };
