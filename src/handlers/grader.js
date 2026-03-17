@@ -65,13 +65,17 @@ function findGameInSchedule(scheduleData, homeTeam, awayTeam) {
   return null;
 }
 
-function determineResult(game, teamPicked, pickType, spreadPoint) {
+function determineResult(game, teamPicked, pickType, spreadPoint, homeTeam = null, awayTeam = null) {
   const awayScore = game.teams?.away?.score;
   const homeScore = game.teams?.home?.score;
   const mlbAway = game.teams?.away?.team?.name || '';
   const mlbHome = game.teams?.home?.team?.name || '';
 
-  const isHome = teamsMatch(mlbHome, teamPicked);
+  // Use stored team names if available for accurate home/away detection
+  const pickedIsHome = homeTeam
+    ? teamsMatch(mlbHome, homeTeam) && teamsMatch(teamPicked, homeTeam)
+    : teamsMatch(mlbHome, teamPicked);
+  const isHome = pickedIsHome;
   const pickedScore = isHome ? homeScore : awayScore;
   const opposingScore = isHome ? awayScore : homeScore;
 
@@ -168,7 +172,7 @@ async function runGrader(client = null) {
           continue;
         }
 
-        const result = determineResult(game, pick.team_picked, pick.pick_type, pick.spread_point);
+        const result = determineResult(game, pick.team_picked, pick.pick_type, pick.spread_point, pick.home_team, pick.away_team);
         const pointsAwarded = getPointsForResult(pick.odds_at_lock, result);
 
         const { error: updateError } = await supabase
