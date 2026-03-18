@@ -157,17 +157,38 @@ async function runGrader(client = null) {
         const TERMINAL_STATES = ['Final', 'Completed Early', 'Game Over'];
         const VOID_STATES = ['Cancelled', 'Postponed', 'Suspended'];
 
-        if (VOID_STATES.includes(state)) {
+        if (VOID_STATES.some(s => state?.startsWith(s))) {
           const { error: voidError } = await supabase
             .from('picks')
             .update({ result: 'void', points_awarded: 0 })
             .eq('id', pick.id);
           if (voidError) throw voidError;
           console.log(`[grader] Voided pick ${pick.id}: ${pick.team_picked} — game ${state}`);
+
+          // DM the player
+          try {
+            const { data: player } = await supabase
+              .from('players')
+              .select('discord_id')
+              .eq('id', pick.player_id)
+              .single();
+
+            if (player?.discord_id && client) {
+              const user = await client.users.fetch(player.discord_id);
+              await user.send(
+                `⚠️ **Pick Voided — ${pick.team_picked}**\n\n` +
+                `Your ${pick.pick_type} pick on **${pick.team_picked}** was voided because the game was **${state.toLowerCase()}**.\n\n` +
+                `Your pick slot has been returned and you can re-pick this game if it gets rescheduled. No points were lost.`
+              );
+            }
+          } catch (dmErr) {
+            console.error(`[grader] Failed to DM player about voided pick ${pick.id}:`, dmErr.message);
+          }
+
           continue;
         }
 
-        if (!TERMINAL_STATES.includes(state)) {
+        if (!TERMINAL_STATES.some(s => state?.startsWith(s))) {
           console.log(`[grader] Game not final yet for pick ${pick.id} (${state}), skipping.`);
           continue;
         }

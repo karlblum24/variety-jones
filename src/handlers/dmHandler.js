@@ -253,12 +253,18 @@ async function handleStep0(message) {
   // Exclude all games this player has picked this week, including cancelled ones (can't re-pick a cancelled game)
   const { data: allPickRows } = await supabase
     .from('picks')
-    .select('game_id')
+    .select('game_id, result, cancelled')
     .eq('player_id', player.id)
     .eq('week_number', weekNumber)
     .eq('season_year', seasonYear);
 
-  const usedGameIds = new Set((allPickRows || []).map(p => p.game_id));
+  // Voided picks return the game slot — player can re-pick
+  // Cancelled picks keep the slot burned — player chose to cancel
+  const usedGameIds = new Set(
+    (allPickRows || [])
+      .filter(p => p.result !== 'void')
+      .map(p => p.game_id)
+  );
   const availableGames = games.filter(g => !usedGameIds.has(g.id));
 
   if (availableGames.length === 0) {
