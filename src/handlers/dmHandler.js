@@ -108,14 +108,41 @@ function buildGameListMessage(games, picksRemaining, isPreseason) {
 
 function findTeamInGames(teamInput, games) {
   const input = teamInput.toLowerCase().trim();
+
   for (const game of games) {
-    if (game.away_team.toLowerCase().includes(input) || input.includes(game.away_team.toLowerCase().split(' ').pop().toLowerCase())) {
-      return { game, teamName: game.away_team };
-    }
-    if (game.home_team.toLowerCase().includes(input) || input.includes(game.home_team.toLowerCase().split(' ').pop().toLowerCase())) {
-      return { game, teamName: game.home_team };
+    const awayLower = game.away_team.toLowerCase();
+    const homeLower = game.home_team.toLowerCase();
+
+    // Exact match
+    if (awayLower === input) return { game, teamName: game.away_team };
+    if (homeLower === input) return { game, teamName: game.home_team };
+  }
+
+  for (const game of games) {
+    const awayLower = game.away_team.toLowerCase();
+    const homeLower = game.home_team.toLowerCase();
+
+    // Full name contains input
+    if (awayLower.includes(input)) return { game, teamName: game.away_team };
+    if (homeLower.includes(input)) return { game, teamName: game.home_team };
+  }
+
+  for (const game of games) {
+    const awayLower = game.away_team.toLowerCase();
+    const homeLower = game.home_team.toLowerCase();
+
+    // Input contains full team name
+    if (input.includes(awayLower)) return { game, teamName: game.away_team };
+    if (input.includes(homeLower)) return { game, teamName: game.home_team };
+
+    // All significant words in input appear in team name
+    const inputWords = input.split(' ').filter(w => w.length > 2);
+    if (inputWords.length > 1) {
+      if (inputWords.every(w => awayLower.includes(w))) return { game, teamName: game.away_team };
+      if (inputWords.every(w => homeLower.includes(w))) return { game, teamName: game.home_team };
     }
   }
+
   return null;
 }
 
@@ -217,20 +244,6 @@ async function handleStep0(message) {
   if (!player.display_name || !player.venmo_handle) {
     await handleOnboardingName(message);
     return;
-  }
-
-  if (player.isNew) {
-    await message.reply(
-      `👋 Welcome to the **2026 PICKS LEAGUE**, big shot!\n\n` +
-      `Here's how it works:\n` +
-      `• Each week you get **3 picks** on MLB games\n` +
-      `• Pick a team **moneyline** (win outright) or **spread** (cover the run line)\n` +
-      `• Odds are locked at submission — bigger underdogs = more points\n` +
-      `• Picks lock when the game starts — cancel anytime before that\n` +
-      `• Grading happens automatically after games finish\n` +
-      `• Type **my picks** to see your picks, **cancel** to cancel one\n\n` +
-      `Now let's get you some games to pick from... 👇`
-    );
   }
 
   const now = new Date();
@@ -527,7 +540,8 @@ async function handleShowPicks(message) {
 
   const pending = picks.filter(p => p.game_start_time > nowIso && p.result === null);
   const locked = picks.filter(p => p.game_start_time <= nowIso && p.result === null);
-  const completed = picks.filter(p => p.result !== null);
+  const completed = picks.filter(p => p.result !== null && p.result !== 'void');
+  const voided = picks.filter(p => p.result === 'void');
 
   const blocks = [];
 
@@ -561,6 +575,14 @@ async function handleShowPicks(message) {
       const odds = p.odds_at_lock;
       const oddsStr = odds !== null ? formatOdds(odds) : 'N/A';
       section += `• **${p.team_picked}** (${p.pick_type}) | Odds: ${oddsStr} | Result: ${p.result} | Points: ${p.points_awarded ?? 0}\n`;
+    }
+    blocks.push(section);
+  }
+
+  if (voided.length > 0) {
+    let section = `🚫 **Voided Picks**\n`;
+    for (const p of voided) {
+      section += `• **${p.team_picked}** (${p.pick_type}) — Game postponed/cancelled. Pick slot returned.\n`;
     }
     blocks.push(section);
   }
@@ -607,7 +629,7 @@ async function handleDM(message) {
 
     const STANDINGS_PHRASES = ['leaderboard', 'standings', 'scoreboard', 'who is winning', 'who is leading', 'who is in first', 'league standings'];
     if (STANDINGS_PHRASES.some(phrase => input.includes(phrase))) {
-      await message.reply('Check out the current standings in **#scoreboard** — it updates every morning at 6am ET and whenever min posts it manually. 📊');
+      await message.reply('Check out the current standings in **#scoreboard** — it updates every morning at 6am ET. 📊');
       return;
     }
 
