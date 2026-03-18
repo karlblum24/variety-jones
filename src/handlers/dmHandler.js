@@ -593,9 +593,15 @@ async function handleDM(message) {
   logger.info(userId, 'DM received', { input });
 
   try {
-    const SHOW_PICKS_PHRASES = ['my picks', 'show my picks', 'show picks', 'show me picks', 'my pick', 'see my picks', 'view picks'];
+    const SHOW_PICKS_PHRASES = ['my picks', 'show my picks', 'show picks', 'show me picks', 'my pick', 'see my picks', 'view picks', 'show me my picks', 'can you show', 'my pick status', 'pick history'];
     if (SHOW_PICKS_PHRASES.some(phrase => input.includes(phrase))) {
       await handleShowPicks(message);
+      return;
+    }
+
+    const STANDINGS_PHRASES = ['leaderboard', 'standings', 'scoreboard', 'who is winning', 'who is leading', 'who is in first', 'league standings'];
+    if (STANDINGS_PHRASES.some(phrase => input.includes(phrase))) {
+      await message.reply('Check out the current standings in **#scoreboard** — it updates every morning at 6am ET and whenever min posts it manually. 📊');
       return;
     }
 
