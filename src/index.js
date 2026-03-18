@@ -34,7 +34,7 @@ for (const file of commandFiles) {
   if (command.data && command.execute) {
     client.commands.set(command.data.name, command);
   } else {
-    logger.warn('index', `${file} is missing "data" or "execute"`);
+    logger.error('index', `${file} is missing "data" or "execute"`, {});
   }
 }
 
