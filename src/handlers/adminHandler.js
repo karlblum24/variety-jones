@@ -2,6 +2,7 @@ const { postScoreboard } = require('./scoreboard');
 const { postDailyRecap } = require('./dailyRecap');
 const { runGrader } = require('./grader');
 const { sendWeeklyReminders } = require('./weeklyReminder');
+const { clearOddsCache } = require('../services/oddsApi');
 const supabase = require('../database/supabase');
 
 const ADMIN_DISCORD_ID = process.env.ADMIN_DISCORD_ID;
@@ -13,7 +14,8 @@ const COMMANDS = `Admin commands:
 !admin remind — send weekly reminders to players with picks remaining
 !admin paid <username> — mark player as paid
 !admin unpaid <username> — mark player as unpaid
-!admin players — list all players with onboarding and payment status`;
+!admin players — list all players with onboarding and payment status
+!admin clearcache — force fresh odds fetch from API`;
 
 async function handleAdminCommand(message, client) {
   if (!ADMIN_DISCORD_ID) return false;
@@ -37,6 +39,9 @@ async function handleAdminCommand(message, client) {
       await message.reply('Running grader...');
       await runGrader(client);
       await message.reply('Done.');
+    } else if (command === 'clearcache') {
+      clearOddsCache();
+      await message.reply('✅ Odds cache cleared. Next pick request will fetch fresh data from the API.');
     } else if (command === 'remind') {
       await message.reply('Sending weekly reminders...');
       await sendWeeklyReminders(client);
