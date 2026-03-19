@@ -56,6 +56,7 @@ function findGameInSchedule(scheduleData, homeTeam, awayTeam) {
       // Fallback: single team match if home/away not stored
       if (!homeTeam || !awayTeam) {
         const teamToFind = homeTeam || awayTeam;
+        if (!teamToFind) continue; // both null — skip, can't match
         if (teamsMatch(mlbAway, teamToFind) || teamsMatch(mlbHome, teamToFind)) {
           return game;
         }
@@ -130,15 +131,20 @@ async function runGrader(client = null) {
     for (const pick of picks) {
       try {
         const gameDate = new Date(pick.game_start_time);
-        let scheduleData = await fetchMLBSchedule(gameDate, 'S');
-        let game = findGameInSchedule(scheduleData, pick.home_team, pick.away_team);
+        let scheduleData;
+        let game = null;
 
-        if (!game) {
-          scheduleData = await fetchMLBSchedule(gameDate, 'R');
+        // Dual-team match — only when both are stored
+        if (pick.home_team && pick.away_team) {
+          scheduleData = await fetchMLBSchedule(gameDate, 'S');
           game = findGameInSchedule(scheduleData, pick.home_team, pick.away_team);
+          if (!game) {
+            scheduleData = await fetchMLBSchedule(gameDate, 'R');
+            game = findGameInSchedule(scheduleData, pick.home_team, pick.away_team);
+          }
         }
 
-        // Fallback for old picks without home_team/away_team stored
+        // Single-team fallback — always runs if dual match failed or not attempted
         if (!game && pick.team_picked) {
           scheduleData = await fetchMLBSchedule(gameDate, 'S');
           game = findGameInSchedule(scheduleData, null, pick.team_picked);
