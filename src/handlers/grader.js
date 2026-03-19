@@ -5,7 +5,7 @@ const { getPointsForResult } = require('../config/scoring');
 const IS_PRESEASON = process.env.IS_PRESEASON === 'true';
 
 async function fetchMLBSchedule(date, gameType) {
-  const dateStr = date.toISOString().split('T')[0];
+  const dateStr = date.toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
   const url = `https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=${dateStr}&gameType=${gameType}`;
   const res = await fetch(url);
   if (!res.ok) throw new Error(`MLB Stats API error: ${res.status}`);
