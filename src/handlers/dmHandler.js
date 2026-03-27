@@ -108,7 +108,9 @@ function buildGameListMessage(games, picksRemaining, isPreseason) {
       block += `   ML: ${game.away_team} (${formatOdds(awayML)}) / ${game.home_team} (${formatOdds(homeML)})\n`;
     }
     if (awaySpread && homeSpread) {
-      block += `   Spread: ${game.away_team} ${awaySpread.point} (${formatOdds(awaySpread.price)}) / ${game.home_team} ${homeSpread.point} (${formatOdds(homeSpread.price)})\n`;
+      const awayPoint = awaySpread.point > 0 ? `+${awaySpread.point}` : `${awaySpread.point}`;
+      const homePoint = homeSpread.point > 0 ? `+${homeSpread.point}` : `${homeSpread.point}`;
+      block += `   Spread: ${game.away_team} ${awayPoint} (${formatOdds(awaySpread.price)}) / ${game.home_team} ${homePoint} (${formatOdds(homeSpread.price)})\n`;
     }
     block += '\n';
     gameBlocks.push(block);
