@@ -47,6 +47,28 @@ function getTeamOdds(market, teamName) {
   return outcome ? outcome.price : null;
 }
 
+function getETDateLabel(isoString) {
+  const now = new Date();
+  const todayET = now.toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
+  const gameET = new Date(isoString).toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
+
+  const gameDateLabel = new Date(isoString).toLocaleDateString('en-US', {
+    timeZone: 'America/New_York',
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+  });
+
+  if (gameET === todayET) return `📅 **TODAY — ${gameDateLabel}**`;
+
+  const tomorrowDate = new Date(now);
+  tomorrowDate.setDate(tomorrowDate.getDate() + 1);
+  const tomorrowET = tomorrowDate.toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
+  if (gameET === tomorrowET) return `📅 **TOMORROW — ${gameDateLabel}**`;
+
+  return `📅 **${gameDateLabel}**`;
+}
+
 function buildGameListMessage(games, picksRemaining, isPreseason) {
   const header = `Hey there big boy! 👀\n\n` + (isPreseason
     ? `⚾ We're in preseason test mode! Make as many picks as you want. The scoreboard resets on Opening Day.\n\n`
@@ -61,7 +83,11 @@ function buildGameListMessage(games, picksRemaining, isPreseason) {
     return h2h !== null || spreads !== null;
   });
 
-  const gameBlocks = usableGames.map((game, i) => {
+  let lastDateLabel = null;
+  let gameNumber = 1;
+  const gameBlocks = [];
+
+  for (const game of usableGames) {
     const h2h = getMarketOdds(game, 'h2h');
     const spreads = getMarketOdds(game, 'spreads');
     const awayML = getTeamOdds(h2h, game.away_team);
@@ -69,7 +95,15 @@ function buildGameListMessage(games, picksRemaining, isPreseason) {
     const awaySpread = spreads ? spreads.outcomes.find(o => o.name === game.away_team) : null;
     const homeSpread = spreads ? spreads.outcomes.find(o => o.name === game.home_team) : null;
 
-    let block = `**${i + 1}.** ${game.away_team} @ ${game.home_team} | ${formatEastern(game.commence_time)} ET\n`;
+    const dateLabel = getETDateLabel(game.commence_time);
+    let block = '';
+
+    if (dateLabel !== lastDateLabel) {
+      block += `${dateLabel}\n`;
+      lastDateLabel = dateLabel;
+    }
+
+    block += `**${gameNumber}.** ${game.away_team} @ ${game.home_team} | ${formatEastern(game.commence_time)} ET\n`;
     if (awayML !== null && homeML !== null) {
       block += `   ML: ${game.away_team} (${formatOdds(awayML)}) / ${game.home_team} (${formatOdds(homeML)})\n`;
     }
@@ -77,8 +111,9 @@ function buildGameListMessage(games, picksRemaining, isPreseason) {
       block += `   Spread: ${game.away_team} ${awaySpread.point} (${formatOdds(awaySpread.price)}) / ${game.home_team} ${homeSpread.point} (${formatOdds(homeSpread.price)})\n`;
     }
     block += '\n';
-    return block;
-  });
+    gameBlocks.push(block);
+    gameNumber++;
+  }
 
   // Header is always its own first chunk
   const chunks = [header];
