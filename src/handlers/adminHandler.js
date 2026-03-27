@@ -1,4 +1,5 @@
 const { postScoreboard } = require('./scoreboard');
+const { postSignupReminder } = require('./dailySignupReminder');
 const { postDailyRecap } = require('./dailyRecap');
 const { runGrader } = require('./grader');
 const { sendWeeklyReminders } = require('./weeklyReminder');
@@ -16,7 +17,8 @@ const COMMANDS = `Admin commands:
 !admin unpaid <username> — mark player as unpaid
 !admin players — list all players with onboarding and payment status
 !admin clearcache — force fresh odds fetch from API
-!admin scan — compare server members vs database`;
+!admin scan — compare server members vs database
+!admin signupreminder — post signup reminder to #general now`;
 
 async function handleAdminCommand(message, client) {
   if (!ADMIN_DISCORD_ID) return false;
@@ -179,6 +181,10 @@ async function handleAdminCommand(message, client) {
       for (const chunk of chunks) {
         await message.reply(chunk);
       }
+    } else if (command === 'signupreminder') {
+      await message.reply('Posting signup reminder...');
+      await postSignupReminder(client);
+      await message.reply('Done.');
     } else {
       await message.reply(COMMANDS);
     }

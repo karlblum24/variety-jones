@@ -9,6 +9,7 @@ const { postScoreboard, startScoreboardScheduler } = require('./handlers/scorebo
 const { startDailyRecap } = require('./handlers/dailyRecap');
 const { handleAdminCommand } = require('./handlers/adminHandler');
 const { startWeeklyReminder } = require('./handlers/weeklyReminder');
+const { startSignupReminder } = require('./handlers/dailySignupReminder');
 const logger = require('./utils/logger');
 
 process.on('unhandledRejection', (err) => logger.error('process', 'Unhandled rejection', err));
@@ -45,6 +46,7 @@ client.once('ready', () => {
   startScoreboardScheduler(client);
   startDailyRecap(client);
   startWeeklyReminder(client);
+  startSignupReminder(client);
 });
 
 client.on('messageCreate', async message => {
