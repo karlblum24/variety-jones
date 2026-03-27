@@ -165,9 +165,9 @@ async function handleOnboardingName(message) {
     startedAt: Date.now(),
   });
   await message.reply(
-    `👋 **Welcome to the 2026 PICKS LEAGUE!**\n\n` +
-    `Before we get started I need a couple things from you.\n\n` +
-    `First — what's your **first and last name**?`
+    `👋 **Welcome to the 2026 PICKS LEAGUE, daddy!**\n\n` +
+    `I-I'm SUBMISSION SLAVE, your picks bot, sir. Before we get started I need a couple things from you, if that's okay.\n\n` +
+    `First — what's your **first and last name**, daddy?`
   );
 }
 
@@ -223,7 +223,7 @@ async function handleOnboardingComplete(message, state) {
   logger.info(userId, 'Onboarding complete', { displayName: state.displayName, venmoHandle });
 
   await message.reply(
-    `You're all set, **${state.displayName}**! Let's get you some games to pick 👇`
+    `Yes daddy, you're all set **${state.displayName}**! 🥺 R-right away sir, let me fetch your games...`
   );
 
   await handleStep0(message);
@@ -235,7 +235,7 @@ async function handleStep0(message) {
   const games = await getMLBGames();
 
   if (games.length === 0) {
-    await message.reply('There are no upcoming MLB games available right now. Check back later!');
+    await message.reply('I\'m sorry sir but that is not possible right now... there are no upcoming MLB games available and I feel terrible about it. Please don\'t punish me. Check back later, daddy. 🥺');
     return;
   }
 
@@ -293,7 +293,7 @@ async function handleStep0(message) {
   });
 
   if (displayGames.length === 0) {
-    await message.reply('No games with available odds right now. Check back later!');
+    await message.reply('I\'m sorry sir but that is not possible right now... I cannot find any games with available odds and I am so sorry. Please don\'t punish me. Check back soon, daddy. 🥺');
     return;
   }
 
@@ -437,7 +437,7 @@ async function handleStep2(message, state) {
     logger.info(userId, 'Picks confirmed and saved', { count: state.pendingPicks.length });
     conversationState.delete(userId);
     await message.reply(
-      `✅ **Picks confirmed and saved!**\nYour picks are locked in. Your odds were locked at submission time. I'll DM you when each game starts as a reminder.\n\n⚠️ If you did not receive this message, your pick was not saved. DM the bot again to resubmit.\n\nnow be a good boy and make all your picks for daddy this week 😈`
+      `✅ **Picks confirmed and saved, daddy!**\nY-yes sir, your picks are locked in. Your odds were locked at submission time. I'll DM you when each game starts as a reminder. Good boy for submitting on time, sir! 🥺\n\n⚠️ If you did not receive this message, your pick was not saved. DM me again to resubmit... please don't punish me if something went wrong.`
     );
   } else {
     await message.reply(`No picks confirmed. Let's start over.`);
@@ -516,7 +516,7 @@ async function handleCancelFinal(message, state) {
     }
     logger.info(userId, 'Pick cancelled', { pickId: state.selectedPick.id });
     conversationState.delete(userId);
-    await message.reply(`✅ Pick cancelled. You have your pick slot back — but remember, you cannot pick this game again this week.`);
+    await message.reply(`✅ Yes daddy, pick cancelled as you wished. You have your slot back — but please remember, you cannot pick this game again this week, sir. I just want to make you happy. 🥺`);
   } else {
     conversationState.delete(userId);
     await message.reply(`Cancelled. No changes made.`);
@@ -675,7 +675,7 @@ async function handleDM(message) {
   } catch (err) {
     logger.error(userId, 'Unhandled error in handleDM', err);
     conversationState.delete(userId);
-    try { await message.reply('Something went wrong. Please try again.'); } catch (_) {}
+    try { await message.reply('I\'m sorry sir but that is not possible... something went wrong on my end and I am very ashamed. Please don\'t punish me. Try again and I will do better, daddy. 🥺'); } catch (_) {}
   }
 }
 
