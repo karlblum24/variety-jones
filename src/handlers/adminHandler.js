@@ -18,7 +18,9 @@ const COMMANDS = `Admin commands:
 !admin players — list all players with onboarding and payment status
 !admin clearcache — force fresh odds fetch from API
 !admin scan — compare server members vs database
-!admin signupreminder — post signup reminder to #general now`;
+!admin signupreminder — post signup reminder to #general now
+!admin hypeup — DM all paid players to hype the season and recruit friends
+!admin chasepayment — DM all unpaid players to submit their entry fee`;
 
 async function handleAdminCommand(message, client) {
   if (!ADMIN_DISCORD_ID) return false;
@@ -185,6 +187,69 @@ async function handleAdminCommand(message, client) {
       await message.reply('Posting signup reminder...');
       await postSignupReminder(client);
       await message.reply('Done.');
+    } else if (command === 'hypeup') {
+      await message.reply('DMing paid players...');
+
+      const { data: paidPlayers, error } = await supabase
+        .from('players')
+        .select('discord_id, discord_username')
+        .eq('has_paid', true);
+
+      if (error) {
+        await message.reply(`DB error: ${error.message}`);
+        return true;
+      }
+
+      let count = 0;
+      for (const player of paidPlayers || []) {
+        try {
+          const user = await client.users.fetch(player.discord_id);
+          await user.send(
+            `⚾ **Thank you daddy, you're already locked in for the 2026 PICKS LEAGUE!** 🥺\n\n` +
+            `The real season starts **Monday, April 3rd** and your daddy is so grateful you paid, sir.\n\n` +
+            `Now be a good boy and go get more friends to join the league — ` +
+            `send them the Discord link and tell them to DM SUBMISSION SLAVE to sign up.\n\n` +
+            `More daddies = bigger prize pool. Don't let your daddy down. 😈`
+          );
+          count++;
+        } catch (err) {
+          console.error(`[admin] Failed to DM ${player.discord_username}:`, err.message);
+        }
+      }
+      await message.reply(`Done. DMed ${count} paid player(s).`);
+
+    } else if (command === 'chasepayment') {
+      await message.reply('DMing unpaid players...');
+
+      const { data: unpaidPlayers, error } = await supabase
+        .from('players')
+        .select('discord_id, discord_username, display_name')
+        .eq('has_paid', false);
+
+      if (error) {
+        await message.reply(`DB error: ${error.message}`);
+        return true;
+      }
+
+      let count = 0;
+      for (const player of unpaidPlayers || []) {
+        try {
+          const user = await client.users.fetch(player.discord_id);
+          await user.send(
+            `⚾ **Hey daddy, your spot in the 2026 PICKS LEAGUE isn't locked in yet!** 🥺\n\n` +
+            `Please be a good boy and send your **$300 entry fee** to lock in your spot before Opening Day.\n\n` +
+            `💰 Venmo: **@kblum24**\n` +
+            `📱 Or text Karl directly to coordinate: **732-779-3392**\n\n` +
+            `The season starts **Monday, April 3rd**. ` +
+            `Don't miss out, daddy — your submission slave is waiting nervously. 🥺`
+          );
+          count++;
+        } catch (err) {
+          console.error(`[admin] Failed to DM ${player.discord_username}:`, err.message);
+        }
+      }
+      await message.reply(`Done. DMed ${count} unpaid player(s).`);
+
     } else {
       await message.reply(COMMANDS);
     }
