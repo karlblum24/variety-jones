@@ -15,7 +15,8 @@ const COMMANDS = `Admin commands:
 !admin paid <username> — mark player as paid
 !admin unpaid <username> — mark player as unpaid
 !admin players — list all players with onboarding and payment status
-!admin clearcache — force fresh odds fetch from API`;
+!admin clearcache — force fresh odds fetch from API
+!admin scan — compare server members vs database`;
 
 async function handleAdminCommand(message, client) {
   if (!ADMIN_DISCORD_ID) return false;
@@ -107,6 +108,74 @@ async function handleAdminCommand(message, client) {
       }
       if (current) chunks.push(current);
 
+      for (const chunk of chunks) {
+        await message.reply(chunk);
+      }
+    } else if (command === 'scan') {
+      await message.reply('Scanning server members vs database...');
+
+      // Get all members from the guild
+      const guild = message.guild || client.guilds.cache.first();
+      if (!guild) {
+        await message.reply('Could not find server. Run this command from inside the server.');
+        return true;
+      }
+
+      // Fetch all members
+      const members = await guild.members.fetch();
+
+      // Get all players from DB
+      const { data: players, error } = await supabase
+        .from('players')
+        .select('discord_id, discord_username, display_name, venmo_handle');
+
+      if (error) {
+        await message.reply(`DB error: ${error.message}`);
+        return true;
+      }
+
+      const dbIds = new Set((players || []).map(p => p.discord_id));
+
+      // Find members not in DB (excluding bots)
+      const missing = members.filter(m =>
+        !m.user.bot && !dbIds.has(m.user.id)
+      );
+
+      // Find DB players not in server
+      const memberIds = new Set(members.map(m => m.user.id));
+      const leftServer = (players || []).filter(p => !memberIds.has(p.discord_id));
+
+      let report = `**Server Scan Results**\n\n`;
+      report += `✅ In server + in DB: ${members.filter(m => !m.user.bot && dbIds.has(m.user.id)).size}\n`;
+      report += `⚠️ In server but NOT in DB (never DMed bot): ${missing.size}\n`;
+      report += `👻 In DB but NOT in server (left server): ${leftServer.length}\n\n`;
+
+      if (missing.size > 0) {
+        report += `**Missing from DB:**\n`;
+        missing.forEach(m => {
+          report += `• ${m.user.username} (${m.user.id})\n`;
+        });
+      }
+
+      if (leftServer.length > 0) {
+        report += `\n**Left server but in DB:**\n`;
+        leftServer.forEach(p => {
+          report += `• ${p.discord_username} — ${p.display_name || 'no name'}\n`;
+        });
+      }
+
+      // Chunk if needed
+      const chunks = [];
+      let current = '';
+      for (const line of report.split('\n')) {
+        if (current.length + line.length + 1 > 1900) {
+          chunks.push(current);
+          current = line;
+        } else {
+          current += (current ? '\n' : '') + line;
+        }
+      }
+      if (current) chunks.push(current);
       for (const chunk of chunks) {
         await message.reply(chunk);
       }
