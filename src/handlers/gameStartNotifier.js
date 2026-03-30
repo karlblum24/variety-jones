@@ -1,6 +1,8 @@
 const supabase = require('../database/supabase');
 const { getPointsForResult } = require('../config/scoring');
 
+const GENERAL_CHANNEL_ID = process.env.GENERAL_CHANNEL_ID;
+
 function formatOdds(odds) {
   return odds >= 0 ? `+${odds}` : `${odds}`;
 }
@@ -11,7 +13,7 @@ async function startGameNotifier(client) {
     try {
       const { data, error } = await supabase
         .from('picks')
-        .select('*, players(discord_id)')
+        .select('*, players(discord_id, discord_username)')
         .is('result', null)
         .not('odds_at_lock', 'is', null)
         .lte('game_start_time', new Date().toISOString())
@@ -25,6 +27,59 @@ async function startGameNotifier(client) {
       return;
     }
 
+    if (!picks || picks.length === 0) return;
+
+    // Group picks by game_id
+    const gameGroups = {};
+    for (const pick of picks) {
+      if (!gameGroups[pick.game_id]) {
+        gameGroups[pick.game_id] = {
+          game_id: pick.game_id,
+          game_start_time: pick.game_start_time,
+          home_team: pick.home_team,
+          away_team: pick.away_team,
+          picks: [],
+        };
+      }
+      gameGroups[pick.game_id].picks.push(pick);
+    }
+
+    // Post one #general announcement per game
+    if (GENERAL_CHANNEL_ID) {
+      try {
+        const channel = await client.channels.fetch(GENERAL_CHANNEL_ID);
+
+        for (const group of Object.values(gameGroups)) {
+          // Build team buckets
+          const teamBuckets = {};
+          for (const pick of group.picks) {
+            const team = pick.team_picked;
+            if (!teamBuckets[team]) teamBuckets[team] = [];
+            const username = pick.players?.discord_username || 'Unknown';
+            const discordId = pick.players?.discord_id;
+            teamBuckets[team].push(discordId ? `<@${discordId}>` : username);
+          }
+
+          const awayTeam = group.away_team || 'Away';
+          const homeTeam = group.home_team || 'Home';
+
+          let msg = `⚾ **${awayTeam} @ ${homeTeam} just started!**\n\n`;
+
+          for (const [team, mentions] of Object.entries(teamBuckets)) {
+            msg += `**${team}:** ${mentions.join(', ')}\n`;
+          }
+
+          msg += `\nGood luck out there! 🤞`;
+
+          await channel.send(msg);
+          console.log(`[notifier] Posted game start announcement for ${awayTeam} @ ${homeTeam}`);
+        }
+      } catch (err) {
+        console.error('[notifier] Error posting game start announcement to #general:', err);
+      }
+    }
+
+    // DM individual players and mark notified
     for (const pick of picks) {
       const discordId = pick.players?.discord_id;
       if (!discordId) continue;
