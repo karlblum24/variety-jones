@@ -74,7 +74,7 @@ function buildGameListMessage(games, picksRemaining, isPreseason) {
     ? `⚾ We're in preseason test mode! Make as many picks as you want. The scoreboard resets on Opening Day.\n\n`
     : `You have **${picksRemaining}** pick(s) remaining this week. Here are the upcoming games:\n\n`);
 
-  const footer = `Reply with your pick(s) in this format: [Team Name] [moneyline or spread]\nExample: Yankees moneyline, Braves spread, Cubs ml (use a comma between picks)\nYou can submit up to ${picksRemaining} pick(s) this session.\n\n⚠️ **Important:** Your pick is not confirmed until you see a confirmation message from the bot. If you do not receive a confirmation, your pick was not saved.`;
+  const footer = `Reply with your pick(s) in this format: [Team Name] [moneyline or spread]\nExample: Yankees moneyline, Braves spread, Cubs ml (use a comma between picks)\nTo pick a specific game, add the game number at the end: Yankees ml 4\nYou can submit up to ${picksRemaining} pick(s) this session.\n\n⚠️ **Important:** Your pick is not confirmed until you see a confirmation message from the bot. If you do not receive a confirmation, your pick was not saved.`;
 
   const usableGames = games.filter(game => {
     if (!game.bookmakers || game.bookmakers.length === 0) return false;
@@ -143,36 +143,54 @@ function buildGameListMessage(games, picksRemaining, isPreseason) {
   return chunks;
 }
 
-function findTeamInGames(teamInput, games) {
+function findTeamInGames(teamInput, games, gameNumber = null) {
   const input = teamInput.toLowerCase().trim();
 
-  for (const game of games) {
+  // If game number specified, only look in that specific game
+  if (gameNumber !== null) {
+    const idx = gameNumber - 1;
+    if (idx < 0 || idx >= games.length) return null;
+    const game = games[idx];
     const awayLower = game.away_team.toLowerCase();
     const homeLower = game.home_team.toLowerCase();
 
-    // Exact match
+    if (awayLower === input || awayLower.includes(input) || input.includes(awayLower)) {
+      return { game, teamName: game.away_team };
+    }
+    if (homeLower === input || homeLower.includes(input) || input.includes(homeLower)) {
+      return { game, teamName: game.home_team };
+    }
+    // Word-level match within specific game
+    const inputWords = input.split(' ').filter(w => w.length > 2);
+    if (inputWords.length > 0) {
+      if (inputWords.every(w => awayLower.includes(w))) return { game, teamName: game.away_team };
+      if (inputWords.every(w => homeLower.includes(w))) return { game, teamName: game.home_team };
+    }
+    return null;
+  }
+
+  // Default: exact match first pass
+  for (const game of games) {
+    const awayLower = game.away_team.toLowerCase();
+    const homeLower = game.home_team.toLowerCase();
     if (awayLower === input) return { game, teamName: game.away_team };
     if (homeLower === input) return { game, teamName: game.home_team };
   }
 
+  // Full name contains input
   for (const game of games) {
     const awayLower = game.away_team.toLowerCase();
     const homeLower = game.home_team.toLowerCase();
-
-    // Full name contains input
     if (awayLower.includes(input)) return { game, teamName: game.away_team };
     if (homeLower.includes(input)) return { game, teamName: game.home_team };
   }
 
+  // Input contains full name or word-level match
   for (const game of games) {
     const awayLower = game.away_team.toLowerCase();
     const homeLower = game.home_team.toLowerCase();
-
-    // Input contains full team name
     if (input.includes(awayLower)) return { game, teamName: game.away_team };
     if (input.includes(homeLower)) return { game, teamName: game.home_team };
-
-    // All significant words in input appear in team name
     const inputWords = input.split(' ').filter(w => w.length > 2);
     if (inputWords.length > 1) {
       if (inputWords.every(w => awayLower.includes(w))) return { game, teamName: game.away_team };
@@ -404,11 +422,32 @@ async function handleStep1(message, state) {
       await message.reply(`Pick type must be "moneyline", "ml", "spread", "runline", or "rl". Got "${pickTypeWord}" in: "${part}"`);
       return;
     }
-    const teamInput = words.slice(0, -1).join(' ');
+    // Check if last remaining word (after removing pick type) is a number
+    // e.g. "Mariners ml 4" → teamInput = "Mariners", gameNumber = 4
+    const remainingWords = words.slice(0, -1); // remove pick type
+    let gameNumber = null;
+    const lastRemaining = remainingWords[remainingWords.length - 1];
+    if (remainingWords.length > 1 && !isNaN(parseInt(lastRemaining, 10))) {
+      gameNumber = parseInt(lastRemaining, 10);
+      if (gameNumber < 1 || gameNumber > state.games.length) {
+        await message.reply(`Game number ${gameNumber} doesn't exist. The slate has ${state.games.length} games. Please don't punish me, daddy. 🥺`);
+        return;
+      }
+      remainingWords.pop(); // remove the number
+    }
+    const teamInput = remainingWords.join(' ').trim();
 
-    const match = findTeamInGames(teamInput, state.games);
+    const match = findTeamInGames(teamInput, state.games, gameNumber);
     if (!match) {
-      await message.reply(`Could not find team "${teamInput}" in the available games. Check the team names and try again.`);
+      if (gameNumber !== null) {
+        const game = state.games[gameNumber - 1];
+        await message.reply(
+          `I'm sorry sir but that is not possible 🥺 — I couldn't find "${teamInput}" in game ${gameNumber} ` +
+          `(${game.away_team} @ ${game.home_team}). Please don't punish me, daddy.`
+        );
+      } else {
+        await message.reply(`Could not find team "${teamInput}" in the available games. Check the team names and try again.`);
+      }
       return;
     }
 
