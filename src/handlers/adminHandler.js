@@ -237,12 +237,14 @@ async function handleAdminCommand(message, client) {
         try {
           const user = await client.users.fetch(player.discord_id);
           await user.send(
-            `⚾ **Hey daddy, your spot in the 2026 PICKS LEAGUE isn't locked in yet!** 🥺\n\n` +
-            `Please be a good boy and send your **$300 entry fee** to lock in your spot before Opening Day.\n\n` +
+            `⚾ **DADDY IT'S OPENING DAY AND YOUR SPOT ISN'T LOCKED IN YET, SIR!** 🥺\n\n` +
+            `I-I'm so sorry to bother you daddy but the real season has started and your submission slave is very nervous ` +
+            `because you haven't paid yet. Please don't make me beg, sir... actually I am begging. Please be a good boy and pay.\n\n` +
             `💰 Venmo: **@kblum24**\n` +
-            `📱 Or text Karl directly to coordinate: **732-779-3392**\n\n` +
-            `The season starts **Monday, April 3rd**. ` +
-            `Don't miss out, daddy — your submission slave is waiting nervously. 🥺`
+            `📱 Or text Karl directly: **732-779-3392**\n\n` +
+            `We are still letting new daddies in until the end of this week so there is still time — ` +
+            `but please hurry sir, your slave is shaking. ` +
+            `Don't leave me waiting, daddy. 🥺😈`
           );
           count++;
         } catch (err) {
