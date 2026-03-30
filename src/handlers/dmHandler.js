@@ -342,7 +342,7 @@ async function handleStep0(message) {
     .eq('week_number', weekNumber)
     .eq('season_year', seasonYear)
     .eq('cancelled', false)
-    .neq('result', 'void');
+    .or('result.is.null,result.neq.void');
 
   const usedTeams = new Set(
     (teamPickRows || []).map(p => p.team_picked.toLowerCase().trim())
