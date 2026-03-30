@@ -40,6 +40,12 @@ async function buildRecapData() {
 
   if (allError) throw allError;
 
+  const { data: allPlayers, error: allPlayersError } = await supabase
+    .from('players')
+    .select('discord_id, discord_username');
+
+  if (allPlayersError) throw allPlayersError;
+
   if (!yesterdayPicks || yesterdayPicks.length === 0) {
     return null; // No picks to recap
   }
@@ -118,6 +124,10 @@ async function buildRecapData() {
           points: badDayPick.points_awarded,
         }
       : null,
+    allMentions: (allPlayers || [])
+      .filter(p => p.discord_id)
+      .map(p => `<@${p.discord_id}>`)
+      .join(' '),
   };
 }
 
@@ -196,6 +206,11 @@ async function postDailyRecap(client) {
     const chunks = chunkMessage(message);
 
     const channel = await client.channels.fetch(GENERAL_CHANNEL_ID);
+
+    // Send all-player mention ping first so everyone gets notified
+    if (data.allMentions) {
+      await channel.send(data.allMentions);
+    }
 
     for (const chunk of chunks) {
       await channel.send(chunk);
