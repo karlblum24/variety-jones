@@ -315,6 +315,21 @@ async function handleStep0(message) {
       .filter(p => p.result !== 'void')
       .map(p => p.game_id)
   );
+
+  // Also track teams already picked this week
+  const { data: teamPickRows } = await supabase
+    .from('picks')
+    .select('team_picked')
+    .eq('player_id', player.id)
+    .eq('week_number', weekNumber)
+    .eq('season_year', seasonYear)
+    .eq('cancelled', false)
+    .neq('result', 'void');
+
+  const usedTeams = new Set(
+    (teamPickRows || []).map(p => p.team_picked.toLowerCase().trim())
+  );
+
   const availableGames = games.filter(g => !usedGameIds.has(g.id));
 
   if (availableGames.length === 0) {
@@ -341,6 +356,7 @@ async function handleStep0(message) {
     weekNumber,
     seasonYear,
     picksRemaining,
+    usedTeams,
     startedAt: Date.now(),
   });
 
@@ -400,7 +416,16 @@ async function handleStep1(message, state) {
       await message.reply(`You already have a pick for ${match.game.away_team} @ ${match.game.home_team}. Only one pick per game.`);
       return;
     }
+
+    const teamKey = match.teamName.toLowerCase().trim();
+    if (state.usedTeams && state.usedTeams.has(teamKey)) {
+      await message.reply(`I'm sorry sir but that is not possible 🥺 — you already picked **${match.teamName}** this week. Each team can only be picked once per week. Please don't punish me, daddy.`);
+      return;
+    }
+
     usedGameIds.add(match.game.id);
+    if (!state.usedTeams) state.usedTeams = new Set();
+    state.usedTeams.add(teamKey);
 
     const odds = getOddsForPick(match.game, match.teamName, pickType);
     if (odds === null) {
