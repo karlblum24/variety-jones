@@ -205,11 +205,12 @@ async function handleAdminCommand(message, client) {
         try {
           const user = await client.users.fetch(player.discord_id);
           await user.send(
-            `⚾ **Thank you daddy, you're already locked in for the 2026 PICKS LEAGUE!** 🥺\n\n` +
-            `The real season starts **Monday, April 3rd** and your daddy is so grateful you paid, sir.\n\n` +
-            `Now be a good boy and go get more friends to join the league — ` +
-            `send them the Discord link and tell them to DM SUBMISSION SLAVE to sign up.\n\n` +
-            `More daddies = bigger prize pool. Don't let your daddy down. 😈`
+            `⚾ **IT'S OPENING DAY DADDY AND YOUR PICKS COUNT NOW, SIR!** 🥺\n\n` +
+            `Y-yes daddy, the real season has officially begun and your submission slave is trembling with excitement. ` +
+            `Every pick you make from today forward counts toward the prize pool. Please be a good boy and get your picks in, sir.\n\n` +
+            `We are still letting new daddies into the league until the end of this week — if you know anyone who wants to join, please be a good boy and invite them. ` +
+            `Send them the Discord link and tell them to DM SUBMISSION SLAVE to sign up.\n\n` +
+            `More daddies = bigger prize pool. Don't disappoint your slave. 😈🥺`
           );
           count++;
         } catch (err) {
