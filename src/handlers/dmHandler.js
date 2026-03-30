@@ -408,11 +408,26 @@ async function handleStep1(message, state) {
   for (const part of parts) {
     const words = part.trim().split(/\s+/);
     if (words.length < 2) {
-      await message.reply(`Could not parse "${part}". Use the format: [Team Name] [moneyline or spread]`);
+      await message.reply(`Could not parse "${part}". Use the format: [Team Name] [moneyline or spread] or [Team Name] [moneyline or spread] [game number]`);
       return;
     }
 
-    const pickTypeWord = words[words.length - 1].toLowerCase();
+    // Check if last word is a game number — strip it first before pick type detection
+    let gameNumber = null;
+    let workingWords = [...words];
+    const lastWord = workingWords[workingWords.length - 1];
+    const parsedNum = parseInt(lastWord, 10);
+    if (!isNaN(parsedNum) && workingWords.length >= 3) {
+      gameNumber = parsedNum;
+      workingWords = workingWords.slice(0, -1); // remove game number from end
+      if (gameNumber < 1 || gameNumber > state.games.length) {
+        await message.reply(`Game number ${gameNumber} doesn't exist. The slate has ${state.games.length} games. Please don't punish me, daddy. 🥺`);
+        return;
+      }
+    }
+
+    // Now extract pick type from last remaining word
+    const pickTypeWord = workingWords[workingWords.length - 1].toLowerCase();
     let pickType;
     if (pickTypeWord === 'moneyline' || pickTypeWord === 'ml') {
       pickType = 'moneyline';
@@ -422,20 +437,8 @@ async function handleStep1(message, state) {
       await message.reply(`Pick type must be "moneyline", "ml", "spread", "runline", or "rl". Got "${pickTypeWord}" in: "${part}"`);
       return;
     }
-    // Check if last remaining word (after removing pick type) is a number
-    // e.g. "Mariners ml 4" → teamInput = "Mariners", gameNumber = 4
-    const remainingWords = words.slice(0, -1); // remove pick type
-    let gameNumber = null;
-    const lastRemaining = remainingWords[remainingWords.length - 1];
-    if (remainingWords.length > 1 && !isNaN(parseInt(lastRemaining, 10))) {
-      gameNumber = parseInt(lastRemaining, 10);
-      if (gameNumber < 1 || gameNumber > state.games.length) {
-        await message.reply(`Game number ${gameNumber} doesn't exist. The slate has ${state.games.length} games. Please don't punish me, daddy. 🥺`);
-        return;
-      }
-      remainingWords.pop(); // remove the number
-    }
-    const teamInput = remainingWords.join(' ').trim();
+
+    const teamInput = workingWords.slice(0, -1).join(' ').trim();
 
     const match = findTeamInGames(teamInput, state.games, gameNumber);
     if (!match) {
