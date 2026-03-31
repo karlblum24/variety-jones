@@ -40,12 +40,6 @@ async function buildRecapData() {
 
   if (allError) throw allError;
 
-  const { data: allPlayers, error: allPlayersError } = await supabase
-    .from('players')
-    .select('discord_id, discord_username');
-
-  if (allPlayersError) throw allPlayersError;
-
   if (!yesterdayPicks || yesterdayPicks.length === 0) {
     return null; // No picks to recap
   }
@@ -124,10 +118,6 @@ async function buildRecapData() {
           points: badDayPick.points_awarded,
         }
       : null,
-    allMentions: (allPlayers || [])
-      .filter(p => p.discord_id)
-      .map(p => `<@${p.discord_id}>`)
-      .join(' '),
   };
 }
 
@@ -142,8 +132,7 @@ someone won you congratulate them breathlessly. When someone lost you
 deliver the news like you're scared of their reaction. You say things like
 "yes daddy", "good boy", "please don't be mad at me" and "I tried my best
 sir". Write the daily recap in this voice — one flowing message, no bullet
-points or headers. Be specific about names and numbers. Use the mention
-field (e.g. <@123456789>) to ping players directly. End with a trembling,
+points or headers. Be specific about names and numbers. When referring to a specific player, use ONLY their mention (e.g. <@123456789>). Do NOT write their username or name alongside the mention. The mention alone is sufficient. End with a trembling,
 anxious hype line begging the players to make their picks today. Keep it
 under 1800 characters.
 
@@ -207,10 +196,8 @@ async function postDailyRecap(client) {
 
     const channel = await client.channels.fetch(GENERAL_CHANNEL_ID);
 
-    // Send all-player mention ping first so everyone gets notified
-    if (data.allMentions) {
-      await channel.send(data.allMentions);
-    }
+    // Send @everyone ping first so everyone gets notified
+    await channel.send('@everyone');
 
     for (const chunk of chunks) {
       await channel.send(chunk);
