@@ -1,5 +1,6 @@
 const supabase = require('../database/supabase');
 const { getPointsForResult } = require('../config/scoring');
+const { getLongestShotLeader } = require('../services/picks');
 
 const GENERAL_CHANNEL_ID = process.env.GENERAL_CHANNEL_ID;
 
@@ -72,7 +73,33 @@ async function startGameNotifier(client) {
             msg += `**${team}:** ${mentions.join(', ')}\n`;
           }
 
-          msg += `\nGood luck out there! 🤞`;
+          // Check for biggest boy contenders in this game
+          try {
+            const leader = await getLongestShotLeader();
+            const leaderOdds = leader ? leader.odds_at_lock : 0;
+
+            const biggestBoyPicks = group.picks.filter(p =>
+              p.odds_at_lock > 0 && p.odds_at_lock > leaderOdds
+            );
+
+            if (biggestBoyPicks.length > 0) {
+              msg += `\n\n👀 **BIGGEST BOY ALERT:**\n`;
+              for (const p of biggestBoyPicks) {
+                const discordId = p.players?.discord_id;
+                const mention = discordId ? `<@${discordId}>` : (p.players?.discord_username || 'Unknown');
+                const pickLabel = p.pick_type === 'spread'
+                  ? `spread${p.spread_point !== null ? ' ' + (p.spread_point > 0 ? '+' + p.spread_point : p.spread_point) : ''}`
+                  : 'ml';
+                msg += `${mention} is on **${p.team_picked}** (${pickLabel}) at **+${p.odds_at_lock}** — `;
+                msg += `if this wins, we have a new longest shot leader! 😤\n`;
+              }
+              msg += `Current leader: ${leader ? `**${leader.players.discord_username}** at **+${leader.odds_at_lock}**` : 'unclaimed'}`;
+            }
+          } catch (err) {
+            console.error('[notifier] Error checking longest shot:', err);
+          }
+
+          msg += `\n\nGood luck out there! 🤞`;
 
           await channel.send(msg);
           console.log(`[notifier] Posted game start announcement for ${awayTeam} @ ${homeTeam}`);
