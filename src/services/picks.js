@@ -99,4 +99,27 @@ async function submitPick(playerId, weekNumber, seasonYear, gameId, teamPicked, 
   return data;
 }
 
-module.exports = { getOrCreatePlayer, getPicksThisWeek, getPendingPicks, cancelPick, submitPick };
+async function getLongestShotLeader() {
+  const now = new Date();
+  const HALF_CUTOFF = new Date('2026-07-14');
+
+  let query = supabase
+    .from('picks')
+    .select('player_id, team_picked, odds_at_lock, points_awarded, players(discord_id, discord_username)')
+    .eq('result', 'win')
+    .not('odds_at_lock', 'is', null)
+    .order('odds_at_lock', { ascending: false })
+    .limit(1);
+
+  if (now < HALF_CUTOFF) {
+    query = query.lt('game_start_time', HALF_CUTOFF.toISOString());
+  } else {
+    query = query.gte('game_start_time', HALF_CUTOFF.toISOString());
+  }
+
+  const { data, error } = await query;
+  if (error) throw error;
+  return data && data.length > 0 ? data[0] : null;
+}
+
+module.exports = { getOrCreatePlayer, getPicksThisWeek, getPendingPicks, cancelPick, submitPick, getLongestShotLeader };
