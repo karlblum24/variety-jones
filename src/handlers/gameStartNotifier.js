@@ -55,9 +55,12 @@ async function startGameNotifier(client) {
           for (const pick of group.picks) {
             const team = pick.team_picked;
             if (!teamBuckets[team]) teamBuckets[team] = [];
-            const username = pick.players?.discord_username || 'Unknown';
             const discordId = pick.players?.discord_id;
-            teamBuckets[team].push(discordId ? `<@${discordId}>` : username);
+            const pickLabel = pick.pick_type === 'spread'
+              ? `spread${pick.spread_point !== null ? ' ' + (pick.spread_point > 0 ? '+' + pick.spread_point : pick.spread_point) : ''}`
+              : 'ml';
+            const mention = discordId ? `<@${discordId}>` : (pick.players?.discord_username || 'Unknown');
+            teamBuckets[team].push(`${mention} (${pickLabel})`);
           }
 
           const awayTeam = group.away_team || 'Away';
