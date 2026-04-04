@@ -49,7 +49,7 @@ async function postScoreboard(client) {
     ] = await Promise.all([
       supabase.from('players').select('id, discord_username'),
       supabase.from('picks').select('player_id, points_awarded, week_number, season_year').not('result', 'is', null),
-      supabase.from('picks').select('player_id').eq('week_number', weekNumber).eq('season_year', seasonYear).eq('cancelled', false),
+      supabase.from('picks').select('player_id, result').eq('week_number', weekNumber).eq('season_year', seasonYear).eq('cancelled', false),
       longestShotQuery,
     ]);
 
@@ -75,6 +75,7 @@ async function postScoreboard(client) {
     // Count this week's picks submitted per player
     const weekPickCounts = {};
     for (const pick of weekPicks || []) {
+      if (pick.result === 'void') continue;
       weekPickCounts[pick.player_id] = (weekPickCounts[pick.player_id] || 0) + 1;
     }
 
