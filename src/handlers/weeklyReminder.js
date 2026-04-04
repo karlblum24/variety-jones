@@ -58,11 +58,16 @@ async function sendWeeklyReminders(client) {
 
       try {
         const user = await client.users.fetch(player.discord_id);
+        const today = new Date().toLocaleDateString('en-US', { timeZone: 'America/New_York', weekday: 'long' });
+        const isSunday = today === 'Sunday';
+
         await user.send(
-          `⚾ **2026 PICKS LEAGUE — Sunday Reminder**\n\n` +
+          `⚾ **2026 PICKS LEAGUE — ${isSunday ? 'Sunday' : 'Saturday'} Reminder**\n\n` +
           `Hey! You still have **${remaining} pick${remaining === 1 ? '' : 's'}** remaining this week.\n\n` +
-          `The week ends tonight — don't leave points on the table. ` +
-          `DM me anything to pull up today's games and get your picks in.\n\n` +
+          `${isSunday
+            ? `The week ends tonight after the last game — don't leave points on the table.`
+            : `The week ends after the last game — you still have today and tomorrow to pick.`
+          } DM me anything to pull up today's games and get your picks in.\n\n` +
           `Don't sleep on it. 😈`
         );
         reminded++;
