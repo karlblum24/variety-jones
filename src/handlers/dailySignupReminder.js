@@ -3,6 +3,44 @@ const supabase = require('../database/supabase');
 
 const GENERAL_CHANNEL_ID = process.env.GENERAL_CHANNEL_ID;
 
+async function postUnpaidReminder(client, channel) {
+  try {
+    const { data: unpaidPlayers, error } = await supabase
+      .from('players')
+      .select('discord_id, discord_username, display_name')
+      .eq('has_paid', false);
+
+    if (error) throw error;
+
+    if (!unpaidPlayers || unpaidPlayers.length === 0) {
+      console.log('[signupReminder] All players paid — skipping unpaid reminder.');
+      return;
+    }
+
+    const lines = unpaidPlayers.map(p => {
+      const mention = p.discord_id ? `<@${p.discord_id}>` : p.discord_username;
+      return `• ${mention}`;
+    }).join('\n');
+
+    await channel.send(
+      `💰 **Daily Payment Reminder**\n\n` +
+      `The following players have not yet paid their $300 entry fee:\n\n` +
+      `${lines}\n\n` +
+      `Please Venmo **@kblum24** or text **732-779-3392** to sort it out. ` +
+      `You must pay to be eligible for prizes. 🥺`
+    );
+
+    console.log(`[signupReminder] Posted unpaid reminder for ${unpaidPlayers.length} player(s).`);
+  } catch (err) {
+    console.error('[signupReminder] Error posting unpaid reminder:', err);
+  }
+}
+
+async function postUnpaidReminderStandalone(client) {
+  const channel = await client.channels.fetch(GENERAL_CHANNEL_ID);
+  await postUnpaidReminder(client, channel);
+}
+
 async function postSignupReminder(client) {
   console.log('[signupReminder] Running daily signup reminder...');
   try {
@@ -27,7 +65,10 @@ async function postSignupReminder(client) {
     );
 
     if (missing.size === 0) {
-      console.log('[signupReminder] All members in DB — skipping reminder.');
+      console.log('[signupReminder] All members in DB — skipping signup reminder.');
+      // Still check unpaid even if everyone is registered
+      const ch = await client.channels.fetch(GENERAL_CHANNEL_ID);
+      await postUnpaidReminder(client, ch);
       return;
     }
 
@@ -70,6 +111,9 @@ async function postSignupReminder(client) {
       await channel.send(body);
     }
 
+    // Also call unpaid reminder
+    await postUnpaidReminder(client, channel);
+
     console.log(`[signupReminder] Posted reminder for ${missing.size} missing member(s).`);
   } catch (err) {
     console.error('[signupReminder] Error:', err);
@@ -83,4 +127,4 @@ function startSignupReminder(client) {
   console.log('[signupReminder] Scheduled daily signup reminder at 10:00 AM ET.');
 }
 
-module.exports = { startSignupReminder, postSignupReminder };
+module.exports = { startSignupReminder, postSignupReminder, postUnpaidReminderStandalone };

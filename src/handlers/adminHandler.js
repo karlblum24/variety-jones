@@ -1,5 +1,5 @@
 const { postScoreboard } = require('./scoreboard');
-const { postSignupReminder } = require('./dailySignupReminder');
+const { postSignupReminder, postUnpaidReminderStandalone } = require('./dailySignupReminder');
 const { postDailyRecap } = require('./dailyRecap');
 const { runGrader } = require('./grader');
 const { sendWeeklyReminders } = require('./weeklyReminder');
@@ -19,6 +19,7 @@ const COMMANDS = `Admin commands:
 !admin clearcache — force fresh odds fetch from API
 !admin scan — compare server members vs database
 !admin signupreminder — post signup reminder to #general now
+!admin unpaidreminder — post unpaid player reminder to #general now
 !admin hypeup — DM all paid players to hype the season and recruit friends
 !admin chasepayment — DM all unpaid players to submit their entry fee`;
 
@@ -186,6 +187,10 @@ async function handleAdminCommand(message, client) {
     } else if (command === 'signupreminder') {
       await message.reply('Posting signup reminder...');
       await postSignupReminder(client);
+      await message.reply('Done.');
+    } else if (command === 'unpaidreminder') {
+      await message.reply('Posting unpaid reminder...');
+      await postUnpaidReminderStandalone(client);
       await message.reply('Done.');
     } else if (command === 'hypeup') {
       await message.reply('DMing paid players...');
