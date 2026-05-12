@@ -46,7 +46,7 @@ client.once('ready', () => {
   startScoreboardScheduler(client);
   startDailyRecap(client);
   startWeeklyReminder(client);
-  startSignupReminder(client);
+  // startSignupReminder(client); // disabled
 });
 
 client.on('messageCreate', async message => {
