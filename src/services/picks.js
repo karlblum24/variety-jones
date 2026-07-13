@@ -126,4 +126,25 @@ async function getLongestShotLeader() {
   return getLongShotWinnerForHalf(now < HALF_CUTOFF ? 'first' : 'second');
 }
 
-module.exports = { getOrCreatePlayer, getPicksThisWeek, getPendingPicks, cancelPick, submitPick, getLongestShotLeader, getLongShotWinnerForHalf, HALF_CUTOFF };
+async function getFirstHalfChampion() {
+  const { data, error } = await supabase
+    .from('picks')
+    .select('player_id, points_awarded, players(discord_username)')
+    .not('result', 'is', null)
+    .lt('game_start_time', HALF_CUTOFF.toISOString());
+
+  if (error) throw error;
+  if (!data || data.length === 0) return null;
+
+  const totals = {};
+  for (const pick of data) {
+    const name = pick.players?.discord_username || 'Unknown';
+    totals[name] = (totals[name] || 0) + Number(pick.points_awarded || 0);
+  }
+
+  const max = Math.max(...Object.values(totals));
+  const leaders = Object.keys(totals).filter(name => totals[name] === max);
+  return { username: leaders.join(' & '), points: max };
+}
+
+module.exports = { getOrCreatePlayer, getPicksThisWeek, getPendingPicks, cancelPick, submitPick, getLongestShotLeader, getLongShotWinnerForHalf, getFirstHalfChampion, HALF_CUTOFF };

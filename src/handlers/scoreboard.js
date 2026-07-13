@@ -2,7 +2,7 @@ const cron = require('node-cron');
 const { EmbedBuilder } = require('discord.js');
 const supabase = require('../database/supabase');
 const { picksPerWeek } = require('../config/scoring');
-const { getLongShotWinnerForHalf } = require('../services/picks');
+const { getLongShotWinnerForHalf, getFirstHalfChampion } = require('../services/picks');
 
 const SCOREBOARD_CHANNEL_ID = process.env.SCOREBOARD_CHANNEL_ID;
 if (!SCOREBOARD_CHANNEL_ID) throw new Error('Missing env var: SCOREBOARD_CHANNEL_ID');
@@ -32,12 +32,14 @@ async function postScoreboard(client) {
       { data: weekPicks, error: weekError },
       firstHalfLongShot,
       secondHalfLongShot,
+      firstHalfChampion,
     ] = await Promise.all([
       supabase.from('players').select('id, discord_username'),
       supabase.from('picks').select('player_id, points_awarded, week_number, season_year').not('result', 'is', null),
       supabase.from('picks').select('player_id, result').eq('week_number', weekNumber).eq('season_year', seasonYear).eq('cancelled', false),
       getLongShotWinnerForHalf('first'),
       getLongShotWinnerForHalf('second'),
+      getFirstHalfChampion(),
     ]);
 
     if (playersError) throw playersError;
@@ -87,6 +89,9 @@ async function postScoreboard(client) {
           return `${rank} **${row.username}** | Season: ${row.seasonPts} pts | This Week: ${row.weekPts} pts | Picks Left: ${picksLeft}`;
         }).join('\n');
 
+    const firstHalfChampionValue = firstHalfChampion
+      ? `**${firstHalfChampion.username}** — ${firstHalfChampion.points} pts (LOCKED)`
+      : 'No graded first-half picks';
     const firstHalfValue = firstHalfLongShot
       ? `**${firstHalfLongShot.players.discord_username}** — ${firstHalfLongShot.team_picked} (${formatOdds(firstHalfLongShot.odds_at_lock)}) — ${firstHalfLongShot.points_awarded} pts (LOCKED)`
       : 'No qualifying winner';
@@ -109,6 +114,7 @@ async function postScoreboard(client) {
       .setColor(0x00ff00)
       .setDescription(description)
       .addFields(
+        { name: '⭐ 1H CHAMPION', value: firstHalfChampionValue },
         { name: '🔒 LONG SHOT — 1H CHAMPION', value: firstHalfValue },
         { name: '🎯 LONG SHOT — 2H LEADER', value: secondHalfValue },
       )
