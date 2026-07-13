@@ -2,11 +2,11 @@ const cron = require('node-cron');
 const { EmbedBuilder } = require('discord.js');
 const supabase = require('../database/supabase');
 const { picksPerWeek } = require('../config/scoring');
+const { getLongShotWinnerForHalf } = require('../services/picks');
 
 const SCOREBOARD_CHANNEL_ID = process.env.SCOREBOARD_CHANNEL_ID;
 if (!SCOREBOARD_CHANNEL_ID) throw new Error('Missing env var: SCOREBOARD_CHANNEL_ID');
 const IS_PRESEASON = process.env.IS_PRESEASON === 'true';
-const HALF_CUTOFF = new Date('2026-07-14');
 
 function getISOWeek(date) {
   const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
@@ -26,37 +26,23 @@ async function postScoreboard(client) {
     const weekNumber = getISOWeek(now);
     const seasonYear = now.getFullYear();
 
-    let longestShotQuery = supabase
-      .from('picks')
-      .select('player_id, team_picked, odds_at_lock, points_awarded, players(discord_username)')
-      .eq('result', 'win')
-      .eq('cancelled', false)
-      .not('odds_at_lock', 'is', null)
-      .order('odds_at_lock', { ascending: false })
-      .limit(1);
-
-    if (now < HALF_CUTOFF) {
-      longestShotQuery = longestShotQuery.lt('game_start_time', HALF_CUTOFF.toISOString());
-    } else {
-      longestShotQuery = longestShotQuery.gte('game_start_time', HALF_CUTOFF.toISOString());
-    }
-
     const [
       { data: allPlayers, error: playersError },
       { data: gradedPicks, error: gradedError },
       { data: weekPicks, error: weekError },
-      { data: longestShotRows, error: longestShotError },
+      firstHalfLongShot,
+      secondHalfLongShot,
     ] = await Promise.all([
       supabase.from('players').select('id, discord_username'),
       supabase.from('picks').select('player_id, points_awarded, week_number, season_year').not('result', 'is', null),
       supabase.from('picks').select('player_id, result').eq('week_number', weekNumber).eq('season_year', seasonYear).eq('cancelled', false),
-      longestShotQuery,
+      getLongShotWinnerForHalf('first'),
+      getLongShotWinnerForHalf('second'),
     ]);
 
     if (playersError) throw playersError;
     if (gradedError) throw gradedError;
     if (weekError) throw weekError;
-    if (longestShotError) throw longestShotError;
 
     // Aggregate season totals per player
     const seasonTotals = {};
@@ -101,10 +87,12 @@ async function postScoreboard(client) {
           return `${rank} **${row.username}** | Season: ${row.seasonPts} pts | This Week: ${row.weekPts} pts | Picks Left: ${picksLeft}`;
         }).join('\n');
 
-    const longestShot = longestShotRows && longestShotRows.length > 0 ? longestShotRows[0] : null;
-    const longestShotValue = longestShot
-      ? `**${longestShot.players.discord_username}** — ${longestShot.team_picked} (${formatOdds(longestShot.odds_at_lock)}) — ${longestShot.points_awarded} pts`
-      : 'No winner yet this half!';
+    const firstHalfValue = firstHalfLongShot
+      ? `**${firstHalfLongShot.players.discord_username}** — ${firstHalfLongShot.team_picked} (${formatOdds(firstHalfLongShot.odds_at_lock)}) — ${firstHalfLongShot.points_awarded} pts (LOCKED)`
+      : 'No qualifying winner';
+    const secondHalfValue = secondHalfLongShot
+      ? `**${secondHalfLongShot.players.discord_username}** — ${secondHalfLongShot.team_picked} (${formatOdds(secondHalfLongShot.odds_at_lock)}) — ${secondHalfLongShot.points_awarded} pts`
+      : 'No winner yet — the 2H crown is up for grabs 👑';
 
     const footer = now.toLocaleString('en-US', {
       timeZone: 'America/New_York',
@@ -120,7 +108,10 @@ async function postScoreboard(client) {
       .setTitle('⚾ 2026 PICKS LEAGUE Standings')
       .setColor(0x00ff00)
       .setDescription(description)
-      .addFields({ name: '🎯 Longest Shot Award', value: longestShotValue })
+      .addFields(
+        { name: '🔒 LONG SHOT — 1H CHAMPION', value: firstHalfValue },
+        { name: '🎯 LONG SHOT — 2H LEADER', value: secondHalfValue },
+      )
       .setFooter({ text: `Last updated: ${footer}` });
 
     const channel = await client.channels.fetch(SCOREBOARD_CHANNEL_ID);

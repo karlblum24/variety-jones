@@ -99,10 +99,9 @@ async function submitPick(playerId, weekNumber, seasonYear, gameId, teamPicked, 
   return data;
 }
 
-async function getLongestShotLeader() {
-  const now = new Date();
-  const HALF_CUTOFF = new Date('2026-07-14');
+const HALF_CUTOFF = new Date('2026-07-14'); // midnight UTC, safely inside the All-Star break dead zone (last 1H games July 12, 2H resumes July 17)
 
+async function getLongShotWinnerForHalf(half) {
   let query = supabase
     .from('picks')
     .select('player_id, team_picked, odds_at_lock, points_awarded, players(discord_id, discord_username)')
@@ -111,7 +110,7 @@ async function getLongestShotLeader() {
     .order('odds_at_lock', { ascending: false })
     .limit(1);
 
-  if (now < HALF_CUTOFF) {
+  if (half === 'first') {
     query = query.lt('game_start_time', HALF_CUTOFF.toISOString());
   } else {
     query = query.gte('game_start_time', HALF_CUTOFF.toISOString());
@@ -122,4 +121,9 @@ async function getLongestShotLeader() {
   return data && data.length > 0 ? data[0] : null;
 }
 
-module.exports = { getOrCreatePlayer, getPicksThisWeek, getPendingPicks, cancelPick, submitPick, getLongestShotLeader };
+async function getLongestShotLeader() {
+  const now = new Date();
+  return getLongShotWinnerForHalf(now < HALF_CUTOFF ? 'first' : 'second');
+}
+
+module.exports = { getOrCreatePlayer, getPicksThisWeek, getPendingPicks, cancelPick, submitPick, getLongestShotLeader, getLongShotWinnerForHalf, HALF_CUTOFF };
