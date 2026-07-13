@@ -106,6 +106,7 @@ async function getLongShotWinnerForHalf(half) {
     .from('picks')
     .select('player_id, team_picked, odds_at_lock, points_awarded, players(discord_id, discord_username)')
     .eq('result', 'win')
+    .eq('cancelled', false)
     .not('odds_at_lock', 'is', null)
     .order('odds_at_lock', { ascending: false })
     .limit(1);
@@ -131,6 +132,7 @@ async function getFirstHalfChampion() {
     .from('picks')
     .select('player_id, points_awarded, players(discord_username)')
     .not('result', 'is', null)
+    .eq('cancelled', false)
     .lt('game_start_time', HALF_CUTOFF.toISOString());
 
   if (error) throw error;
