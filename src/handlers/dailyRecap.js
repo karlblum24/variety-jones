@@ -27,18 +27,24 @@ async function buildRecapData() {
     .from('picks')
     .select('*, players(discord_username, discord_id)')
     .not('result', 'is', null)
+    .eq('cancelled', false)
     .gte('game_start_time', yesterdayMidnightET.toISOString())
     .lt('game_start_time', todayMidnightET.toISOString());
 
   if (yesterdayError) throw yesterdayError;
 
-  // Fetch all graded picks for league standings
-  const { data: allPicks, error: allError } = await supabase
-    .from('picks')
-    .select('player_id, points_awarded, players(discord_username, discord_id)')
-    .not('result', 'is', null);
+  // League standings, pre-aggregated in Postgres. Reading every graded pick
+  // here hit the PostgREST 1000-row cap and froze the standings.
+  const [
+    { data: seasonRows, error: seasonError },
+    { data: players, error: playersError },
+  ] = await Promise.all([
+    supabase.from('player_season_totals').select('player_id, season_points'),
+    supabase.from('players').select('id, discord_id, discord_username'),
+  ]);
 
-  if (allError) throw allError;
+  if (seasonError) throw seasonError;
+  if (playersError) throw playersError;
 
   if (!yesterdayPicks || yesterdayPicks.length === 0) {
     return null; // No picks to recap
@@ -68,13 +74,17 @@ async function buildRecapData() {
     .filter(p => p.result === 'win' && p.odds_at_lock !== null && p.odds_at_lock > 0)
     .sort((a, b) => b.odds_at_lock - a.odds_at_lock)[0] || null;
 
-  // League standings
+  // League standings. The view is grouped by season, so a player with picks in
+  // more than one season contributes one row per season — summing them keeps
+  // the all-time total this recap has always reported.
+  const playersById = new Map((players || []).map(p => [p.id, p]));
   const seasonTotals = {};
-  for (const pick of allPicks || []) {
-    const id = pick.players?.discord_id;
-    const name = pick.players?.discord_username || 'Unknown';
+  for (const row of seasonRows || []) {
+    const player = playersById.get(row.player_id);
+    const id = player?.discord_id;
+    const name = player?.discord_username || 'Unknown';
     if (!seasonTotals[id]) seasonTotals[id] = { name, points: 0 };
-    seasonTotals[id].points += Number(pick.points_awarded || 0);
+    seasonTotals[id].points += Number(row.season_points || 0);
   }
   const leagueLeader = Object.entries(seasonTotals)
     .sort((a, b) => b[1].points - a[1].points)[0];

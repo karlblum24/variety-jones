@@ -128,20 +128,28 @@ async function getLongestShotLeader() {
 }
 
 async function getFirstHalfChampion() {
-  const { data, error } = await supabase
-    .from('picks')
-    .select('player_id, points_awarded, players(discord_username)')
-    .not('result', 'is', null)
-    .eq('cancelled', false)
-    .lt('game_start_time', HALF_CUTOFF.toISOString());
+  // Totalled in Postgres — reading every first-half pick here hit the
+  // PostgREST 1000-row cap. get_half_totals returns one row per player.
+  const [
+    { data, error },
+    { data: players, error: playersError },
+  ] = await Promise.all([
+    supabase.rpc('get_half_totals', {
+      cutoff_start: '1970-01-01',
+      cutoff_end: HALF_CUTOFF.toISOString(),
+    }),
+    supabase.from('players').select('id, discord_username'),
+  ]);
 
   if (error) throw error;
+  if (playersError) throw playersError;
   if (!data || data.length === 0) return null;
 
+  const namesById = new Map((players || []).map(p => [p.id, p.discord_username]));
   const totals = {};
-  for (const pick of data) {
-    const name = pick.players?.discord_username || 'Unknown';
-    totals[name] = (totals[name] || 0) + Number(pick.points_awarded || 0);
+  for (const row of data) {
+    const name = namesById.get(row.player_id) || 'Unknown';
+    totals[name] = (totals[name] || 0) + Number(row.total_points || 0);
   }
 
   const max = Math.max(...Object.values(totals));

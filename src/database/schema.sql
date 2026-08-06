@@ -33,3 +33,34 @@ create table if not exists picks (
   created_at      timestamptz default now()
 );
 
+-- Aggregates. These exist so standings are summed in Postgres rather than in
+-- Node: PostgREST caps every response at 1000 rows, so any query that pulled
+-- all graded picks and summed them client-side silently froze once the league
+-- crossed 1000 graded picks. Each view returns one row per player, so it stays
+-- far under the cap.
+
+create or replace view player_season_totals as
+select player_id, season_year, sum(points_awarded) as season_points
+from picks
+where result is not null and cancelled = false
+group by player_id, season_year;
+
+create or replace view player_week_totals as
+select player_id, season_year, week_number, sum(points_awarded) as week_points
+from picks
+where result is not null and cancelled = false
+group by player_id, season_year, week_number;
+
+-- Points per player within an arbitrary game_start_time window, used for the
+-- first/second half champion. Pass '1970-01-01' as cutoff_start for the first
+-- half (the halves are split on HALF_CUTOFF in src/services/picks.js).
+create or replace function get_half_totals(cutoff_start timestamptz, cutoff_end timestamptz)
+returns table (player_id uuid, total_points numeric)
+language sql stable as $$
+  select p.player_id, sum(p.points_awarded)
+  from picks p
+  where p.result is not null and p.cancelled = false
+    and p.game_start_time >= cutoff_start and p.game_start_time < cutoff_end
+  group by p.player_id
+$$;
+

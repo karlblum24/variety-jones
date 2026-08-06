@@ -28,14 +28,16 @@ async function postScoreboard(client) {
 
     const [
       { data: allPlayers, error: playersError },
-      { data: gradedPicks, error: gradedError },
+      { data: seasonRows, error: seasonError },
+      { data: weekRows, error: weekTotalsError },
       { data: weekPicks, error: weekError },
       firstHalfLongShot,
       secondHalfLongShot,
       firstHalfChampion,
     ] = await Promise.all([
       supabase.from('players').select('id, discord_username'),
-      supabase.from('picks').select('player_id, points_awarded, week_number, season_year').not('result', 'is', null),
+      supabase.from('player_season_totals').select('player_id, season_points').eq('season_year', seasonYear),
+      supabase.from('player_week_totals').select('player_id, week_points').eq('season_year', seasonYear).eq('week_number', weekNumber),
       supabase.from('picks').select('player_id, result').eq('week_number', weekNumber).eq('season_year', seasonYear).eq('cancelled', false),
       getLongShotWinnerForHalf('first'),
       getLongShotWinnerForHalf('second'),
@@ -43,21 +45,20 @@ async function postScoreboard(client) {
     ]);
 
     if (playersError) throw playersError;
-    if (gradedError) throw gradedError;
+    if (seasonError) throw seasonError;
+    if (weekTotalsError) throw weekTotalsError;
     if (weekError) throw weekError;
 
-    // Aggregate season totals per player
+    // Season and week totals come pre-aggregated from Postgres — one row per
+    // player, so they can't be truncated by the PostgREST 1000-row cap.
     const seasonTotals = {};
-    for (const pick of gradedPicks || []) {
-      seasonTotals[pick.player_id] = (seasonTotals[pick.player_id] || 0) + Number(pick.points_awarded);
+    for (const row of seasonRows || []) {
+      seasonTotals[row.player_id] = Number(row.season_points || 0);
     }
 
-    // Aggregate this week's points per player
     const weekPoints = {};
-    for (const pick of gradedPicks || []) {
-      if (pick.week_number === weekNumber && pick.season_year === seasonYear) {
-        weekPoints[pick.player_id] = (weekPoints[pick.player_id] || 0) + Number(pick.points_awarded);
-      }
+    for (const row of weekRows || []) {
+      weekPoints[row.player_id] = Number(row.week_points || 0);
     }
 
     // Count this week's picks submitted per player
